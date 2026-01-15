@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rc
 import glob
 import os
-import smc_plot # probably don't need to use
+# import smc_plot # probably don't need to use
 import matplotlib.lines as mlines
 from matplotlib.backends.backend_pdf import PdfPages
 
