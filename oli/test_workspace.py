@@ -34,7 +34,7 @@ def adjust_calibration(
     cal_flux = flux_map.get(calibration_year)
 
     non_constant_mult = flux / cal_flux
-    balmer_mask = np.zeros(lam01.shape, dtype=bool)
+    balmer_mask = np.zeros(lam.shape, dtype=bool)
 
     lambdas_to_ignore = [
         get_lam_bounds(H_ALPHA, lambdas_to_ignore_width),
@@ -42,7 +42,7 @@ def adjust_calibration(
     ]
 
     for start, end in lambdas_to_ignore:
-        current_range_mask = (lam01 >= start) & (lam01 <= end)
+        current_range_mask = (lam >= start) & (lam <= end)
         balmer_mask = balmer_mask | current_range_mask
 
     removed = np.copy(non_constant_mult)
@@ -52,8 +52,8 @@ def adjust_calibration(
 
     if plot_ratio_selection:
         plt.figure(figsize=(12,5))
-        plt.plot(lam01, non_constant_mult, color='black', label=f'{year_to_change} to {calibration_year}', lw = LINEWIDTH)
-        plt.plot(lam01, removed, color='red', label=f'{year_to_change} to {calibration_year} (ignored Balmer)', lw = LINEWIDTH)
+        plt.plot(lam, non_constant_mult, color='black', label=f'{year_to_change} to {calibration_year}', lw = LINEWIDTH)
+        plt.plot(lam, removed, color='red', label=f'{year_to_change} to {calibration_year} (ignored Balmer)', lw = LINEWIDTH)
         plt.xlabel("Wavelength (Å)")
         plt.ylabel("Ratio")
         plt.title(f"Flux ratio of {year_to_change} to {calibration_year}")
@@ -61,28 +61,28 @@ def adjust_calibration(
         plt.show()
     
     polynom, _ = get_polynom_fit(
-        lambdas=lam01, vals=non_constant_mult,
+        lambdas=lam, vals=non_constant_mult,
         degree=poly_degree, bin_by_med=bin_by_med,
         bin_width=bin_width, plot_result=plot_poly_ratio,
         title = f"Spectrum ratio of {year_to_change} to {calibration_year}"
     )
 
-    adjusted_flux = flux / polynom(lam01)
+    adjusted_flux = flux / polynom(lam)
 
     polynom, _ = get_polynom_fit(
-        lambdas=lam01, vals=non_constant_mult,
+        lambdas=lam, vals=non_constant_mult,
         degree=poly_degree, bin_by_med=bin_by_med,
         bin_width=bin_width, plot_result=plot_poly_ratio,
         title = f"Spectrum ratio of {year_to_change} to {calibration_year}"
     )
 
-    adjusted_flux = flux / polynom(lam01)
+    adjusted_flux = flux / polynom(lam)
 
     if plot_adjusted:
         plt.figure(figsize=(12,5))
-        plt.plot(lam01, cal_flux, color='black', label=calibration_year, lw = LINEWIDTH)
-        plt.plot(lam01, flux, color='orange', label=year_to_change, lw = LINEWIDTH)
-        plt.plot(lam01, adjusted_flux, color='red', label=f'{year_to_change} (polynomial fit to {calibration_year})', lw = LINEWIDTH)
+        plt.plot(lam, cal_flux, color='black', label=calibration_year, lw = LINEWIDTH)
+        plt.plot(lam, flux, color='orange', label=year_to_change, lw = LINEWIDTH)
+        plt.plot(lam, adjusted_flux, color='red', label=f'{year_to_change} (polynomial fit to {calibration_year})', lw = LINEWIDTH)
         if adjusted_plot_lam_bounds is not None:
             plt.xlim(adjusted_plot_lam_bounds)
         if adjusted_plot_flux_bounds is not None:
