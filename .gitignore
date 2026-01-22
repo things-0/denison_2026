@@ -6,3 +6,4 @@ oli/papers/*
 oli/ssp_reports/*
 oli/data/*
 .DS_Store
+.vscode/*
