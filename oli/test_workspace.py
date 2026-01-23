@@ -1,263 +1,167 @@
 import numpy as np
-from scipy.signal import find_peaks
-from scipy.signal import peak_widths
-from lmfit.models import GaussianModel
-from scipy.integrate import simpson
-import matplotlib.pyplot as plt
+from astropy.table import Table
+import sys
+import argparse as ap
+from astropy.time import Time
+from astropy.coordinates import (
+    SkyCoord,
+    EarthLocation
+    )
+import astropy.units as u
 
-# Trapezoidal rule with error propagation
-def integrate_flux_with_err(lam, flux, sigma):
-    # Trapezoidal: integral = sum of (f_i + f_{i+1})/2 * dx_i
-    dx = np.diff(lam)
-    
-    # Flux integral (trapezoidal)
-    flux_integral = np.sum((flux[:-1] + flux[1:]) / 2 * dx)
-    
-    # Error propagation: each flux point contributes to two trapezoids
-    # (except endpoints which contribute to one)
-    weights = np.zeros_like(lam)
-    weights[0] = dx[0] / 2
-    weights[-1] = dx[-1] / 2
-    weights[1:-1] = (dx[:-1] + dx[1:]) / 2
-    
-    flux_err = np.sqrt(np.sum((weights * sigma)**2))
-    
-    return flux_integral, flux_err
+# =============================================================================
+# Flux measurements from different telescopes for SAMI 323854
+# =============================================================================
 
-def integrate_flux_with_err(
-    lam: np.ndarray,
-    spec_flux_density: np.ndarray,
-    spec_flux_density_err: np.ndarray
-) -> tuple[float, float]:
-    flux_integral = np.trapz(spec_flux_density, x=lam)
+# ATLAS difference imaging fluxes (in micro-Jansky)
+atlas_2021_fluxes = np.array([17, 5, 16, 38])
+atlas_2021_fluxes_errs = np.array([8, 9, 8, 10])
 
-    dx = np.diff(lam)
-    # Weights for interior points are 1.0 (0.5 from left trap + 0.5 from right trap)
-    # Weights for endpoints are 0.5
+atlas_2022_fluxes = np.array([-2, -21, 12, 15])
+atlas_2022_fluxes_errs = np.array([13, 11, 12, 11])
+
+def get_weighted_average(flux, flux_err):
+    """
+    Calculate inverse-variance weighted mean and its uncertainty.
     
-    # General case for non-uniform spacing:
-    # Each sigma_i is multiplied by (dx_{i-1} + dx_i) / 2
-    err_weights = np.zeros_like(lam)
-    err_weights[1:] += dx / 2
-    err_weights[:-1] += dx / 2
-    
-    flux_integral_err = np.sqrt(np.sum((err_weights * spec_flux_density_err)**2))
-
-    return flux_integral, flux_integral_err
-
-
-
-def integrate_flux(
-    lam: np.ndarray,
-    spec_flux_density: np.ndarray,
-    spec_flux_density_err: np.ndarray,
-    lam_bounds: tuple[float, float],
-    use_mult_gaussians: bool = False,
-    n_gaussians: int = 1,
-    n_trials: int = 1000  # Monte Carlo samples
-) -> tuple[float, float]:
-    
-    valid_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]))
-    x = lam[valid_mask]
-    y = spec_flux_density[valid_mask]
-    sig = spec_flux_density_err[valid_mask]
-    sig[sig == 0] = np.min(sig[sig > 0])  # avoid division by zero
-    weights = 1.0 / sig
-    
-    if use_mult_gaussians:
-        # 1. Detect peaks and estimate initial params
-        peaks, properties = find_peaks(y, height=np.std(y)*3, distance=3)
-        peaks = peaks[:n_gaussians]
-        mu_guesses = x[peaks]
-        amp_guesses = y[peaks]  # Use y[peaks] instead of properties["peak_heights"] 
-                                 # since peaks was shortened
-        results_half = peak_widths(y, peaks, rel_height=0.5)
-        sigma_guesses = results_half[0] * (x[1] - x[0]) / (2*np.sqrt(2*np.log(2)))
+    Parameters
+    ----------
+    flux : np.ndarray
+        Array of flux measurements
+    flux_err : np.ndarray
+        Array of flux uncertainties
         
-        # 2. Build multi-Gaussian model
-        model, params = None, None
-        for i, (amp, mu, sigma) in enumerate(zip(amp_guesses, mu_guesses, sigma_guesses)):
-            prefix = f"Gaussian_model_{i+1}_"
-            g = GaussianModel(prefix=prefix)
-            if model is None:
-                model, params = g, g.make_params()
-            else:
-                model += g
-                params.update(g.make_params())
-            params[prefix+'amplitude'].set(value=amp*np.sqrt(2*np.pi)*sigma, min=0)
-            params[prefix+'center'].set(value=mu)
-            params[prefix+'sigma'].set(value=sigma, min=0.1)
-        
-        # 3. Monte Carlo integration (Tyler's approach)
-        flux_list = []
-        for _ in range(n_trials):
-            y_perturbed = y + np.random.normal(0, sig)
-            result_mc = model.fit(y_perturbed, params.copy(), x=x, weights=weights)
-            flux_list.append(np.trapz(result_mc.best_fit, x))
-        
-        flux = np.mean(flux_list)
-        flux_err = np.std(flux_list)
+    Returns
+    -------
+    weighted_mean : float
+        The weighted mean of the flux values
+    uncertainty : float
+        The uncertainty on the weighted mean
+    """
+    weights = 1.0 / (flux_err**2)
+    weighted_mean = np.sum(flux * weights) / np.sum(weights)
+    uncertainty = 1.0 / np.sqrt(np.sum(weights))
+    return weighted_mean, uncertainty
 
-    else:
-        flux = np.trapz(spec_flux_density, x=lam)
+# =============================================================================
+# ATLAS Weighted Averages
+# =============================================================================
+print("=" * 70)
+print("ATLAS Difference Imaging Flux Weighted Averages (micro-Jansky)")
+print("=" * 70)
 
-        dx = np.diff(lam)
-        # Weights for interior points are 1.0 (0.5 from left trap + 0.5 from right trap)
-        # Weights for endpoints are 0.5
-        
-        # General case for non-uniform spacing:
-        # Each sigma_i is multiplied by (dx_{i-1} + dx_i) / 2
-        err_weights = np.zeros_like(lam)
-        err_weights[1:] += dx / 2
-        err_weights[:-1] += dx / 2
-        
-        flux_err = np.sqrt(np.sum((err_weights * spec_flux_density_err)**2))
-    
-    return flux, flux_err
+atlas_2021_mean, atlas_2021_err = get_weighted_average(atlas_2021_fluxes, atlas_2021_fluxes_errs)
+atlas_2022_mean, atlas_2022_err = get_weighted_average(atlas_2022_fluxes, atlas_2022_fluxes_errs)
 
-def integrate_flux(
-    lam: np.ndarray,
-    flux_diff: np.ndarray,
-    sigma_diff: np.ndarray,
-    lam_bounds: tuple[float, float],
-    use_mult_gaussians: bool = False,
-    n_gaussians: int = 1
-) -> tuple[float, float]:
-    valid_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]))
-    lam_portion = lam[valid_mask]
-    flux_portion = flux_diff[valid_mask]
-    sig_portion = sigma_diff[valid_mask]
-    
-    if use_mult_gaussians:
-        #TODO: add stuff here
-        pass
-    else:
-        #TODO: manually do trapezoidal rule so that errors can be calculated
-            # see test_workspace.py
-        flux = simpson(flux_portion, x=lam_portion)
-        flux_err = None
-        #
+print(f"ATLAS 2021: {atlas_2021_mean:.3f} ± {atlas_2021_err:.3f} μJy")
+print(f"  Input fluxes: {atlas_2021_fluxes} μJy")
+print(f"  Input errors: {atlas_2021_fluxes_errs} μJy")
+print()
+print(f"ATLAS 2022: {atlas_2022_mean:.3f} ± {atlas_2022_err:.3f} μJy")
+print(f"  Input fluxes: {atlas_2022_fluxes} μJy")
+print(f"  Input errors: {atlas_2022_fluxes_errs} μJy")
+print()
 
-    return flux, flux_err
+# =============================================================================
+# ZTF Magnitude to Flux Conversion
+# =============================================================================
+print("=" * 70)
+print("ZTF Magnitude to Flux Conversion")
+print("=" * 70)
 
-def integrate_flux(
-    lam: np.ndarray,
-    flux_diff: np.ndarray,
-    sigma_diff: np.ndarray,
-    lam_bounds: tuple[float, float],
-    use_mult_gaussians: bool = False,
-    n_gaussians: int = 1
-) -> tuple[float, float]:
-    valid_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]))
-    lam_portion = lam[valid_mask]
-    flux_portion = flux_diff[valid_mask]
-    sig_portion = sigma_diff[valid_mask]
-    
-    if use_mult_gaussians:
-        #TODO: add stuff here
-        pass
-    else:
-        #TODO: manually do trapezoidal rule so that errors can be calculated
-            # see test_workspace.py
-        flux = simpson(flux_portion, x=lam_portion)
-        flux_err = None
-        #
+ztf_2021_mag = np.array([16.5218, 16.5421, 16.5487])
+ztf_2021_mag_err = np.array([0.014664, 0.01477, 0.014804])
 
-    return flux, flux_err
+ztf_2022_mag = np.array([16.6011])
+ztf_2022_mag_err = np.array([0.01509])
 
-def integrate_flux(
-    lam: np.ndarray,
-    flux_diff: np.ndarray,
-    sigma_diff: np.ndarray,
-    lam_bounds: tuple[float, float],
-    use_mult_gaussians: bool = False,
-    n_gaussians: int = 1,
-    n_trials: int = 1000,  # Monte Carlo samples
-    plot_fit: bool = False  # Plot the Gaussian fit
-) -> tuple[float, float]:
-    
-    valid_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]))
-    x = lam[valid_mask]
-    y = flux_diff[valid_mask]
-    sig = sigma_diff[valid_mask]
-    sig[sig == 0] = np.min(sig[sig > 0])  # avoid division by zero
-    weights = 1.0 / sig
-    
-    if use_mult_gaussians:
-        # 1. Detect peaks and estimate initial params
-        peaks, properties = find_peaks(y, height=np.std(y)*3, distance=3)
-        peaks = peaks[:n_gaussians]
-        mu_guesses = x[peaks]
-        amp_guesses = y[peaks]  # Use y[peaks] instead of properties["peak_heights"] 
-                                 # since peaks was shortened
-        results_half = peak_widths(y, peaks, rel_height=0.5)
-        sigma_guesses = results_half[0] * (x[1] - x[0]) / (2*np.sqrt(2*np.log(2)))
-        
-        # 2. Build multi-Gaussian model
-        model, params = None, None
-        for i, (amp, mu, sigma) in enumerate(zip(amp_guesses, mu_guesses, sigma_guesses)):
-            prefix = f"g{i}_"
-            g = GaussianModel(prefix=prefix)
-            if model is None:
-                model, params = g, g.make_params()
-            else:
-                model += g
-                params.update(g.make_params())
-            params[prefix+'amplitude'].set(value=amp*np.sqrt(2*np.pi)*sigma, min=0)
-            params[prefix+'center'].set(value=mu)
-            params[prefix+'sigma'].set(value=sigma, min=0.1)
-        
-        # Fit the model on original data (for plotting)
-        result = model.fit(y, params, x=x, weights=weights)
-        
-        # 3. Monte Carlo integration (Tyler's approach)
-        flux_list = []
-        for _ in range(n_trials):
-            y_perturbed = y + np.random.normal(0, sig)
-            result_mc = model.fit(y_perturbed, params.copy(), x=x, weights=weights)
-            flux_list.append(np.trapz(result_mc.best_fit, x))
-        
-        flux = np.mean(flux_list)
-        flux_err = np.std(flux_list)
-        
-        # 4. Plot the fit if requested
-        if plot_fit:
-            redchisq = result.redchi  # lmfit stores reduced chisq here
-            plt.figure(figsize=(10, 6))
-            plt.plot(x, y, label="Data", alpha=0.6)
-            plt.plot(x, result.best_fit, 'r-', label="Total fit", linewidth=2)
-            
-            # Plot each component separately
-            for name, comp in result.eval_components(x=x).items():
-                plt.plot(x, comp, '--', label=name)
-            
-            # Plot uncertainty band (gray stripe)
-            plt.fill_between(
-                x,
-                y - sig,
-                y + sig,
-                color="gray",
-                alpha=0.3,
-                label="Uncertainty"
-            )
-            plt.ylabel('Flux (10⁻¹⁷ erg s⁻¹ cm⁻² Å⁻¹)')
-            plt.xlabel("Wavelength (Å)")
-            plt.title("Multi-Gaussian Fit Difference Spectrum")
-            
-            plt.text(
-                0.05, 0.95,
-                f"Reduced χ² = {result.redchi:.2f}",
-                transform=plt.gca().transAxes,
-                fontsize=12,
-                verticalalignment='top'
-            )
-            plt.legend()
-            plt.show()
-    else:
-        # Simple trapezoidal with error propagation
-        flux = np.trapz(y, x)
-        # Analytical error: sqrt(sum of (dx * sigma)^2) for trapezoid
-        dx = np.diff(x)
-        flux_err = np.sqrt(np.sum((0.5 * (sig[:-1] + sig[1:]) * dx)**2))
-    
-    return flux, flux_err
+# Convert AB magnitude to flux in milli-Jansky
+# Formula: F_Jy = 3631 * 10^(-0.4 * mag), then multiply by 1000 for mJy
+ztf_2022_flux_mJy = 3631 * 10**(-0.4 * ztf_2022_mag) * 1000
+# Flux error propagation: δF/F = 0.921 * δm (where 0.921 ≈ ln(10)/2.5)
+ztf_2022_flux_err_mJy = ztf_2022_flux_mJy * 0.921 * ztf_2022_mag_err
+
+ztf_2022_mean, ztf_2022_err = get_weighted_average(ztf_2022_flux_mJy, ztf_2022_flux_err_mJy)
+
+print(f"ZTF 2022 magnitude: {ztf_2022_mag[0]:.4f} ± {ztf_2022_mag_err[0]:.5f} mag")
+print(f"ZTF 2022 flux:      {ztf_2022_mean:.4f} ± {ztf_2022_err:.4f} mJy")
+print(f"  Conversion: F_mJy = 3631 × 10^(-0.4 × mag) × 1000")
+print()
+
+# Convert observation time
+t_mjd = Time(2459252.77, format='jd').mjd
+print(f"Reference observation time: JD 2459252.77 = MJD {t_mjd:.2f}")
+print()
+
+# =============================================================================
+# ASAS-SN Weighted Averages
+# =============================================================================
+print("=" * 70)
+print("ASAS-SN Flux Weighted Averages (milli-Jansky)")
+print("=" * 70)
+
+asn_2021_flux = np.array([1.036])
+asn_2021_flux_err = np.array([0.033])
+
+asn_2022_flux = np.array([0.944, 0.974])
+asn_2022_flux_err = np.array([0.022, 0.029])
+
+asn_2021_mean, asn_2021_err = get_weighted_average(asn_2021_flux, asn_2021_flux_err)
+asn_2022_mean, asn_2022_err = get_weighted_average(asn_2022_flux, asn_2022_flux_err)
+
+print(f"ASAS-SN 2021: {asn_2021_mean:.3f} ± {asn_2021_err:.3f} mJy")
+print(f"  Input fluxes: {asn_2021_flux} mJy")
+print()
+print(f"ASAS-SN 2022: {asn_2022_mean:.3f} ± {asn_2022_err:.3f} mJy")
+print(f"  Input fluxes: {asn_2022_flux} mJy")
+print()
+
+# =============================================================================
+# Attenuation Corrections
+# =============================================================================
+print("=" * 70)
+print("Attenuation-Corrected Fluxes (milli-Jansky)")
+print("=" * 70)
+print("Attenuation factors (fraction of flux from AGN):")
+
+# Attenuation factors - fraction of total flux from AGN
+# These represent how much the AGN variability is "diluted" by host galaxy light
+ztf_atten = 0.137  # ZTF r-band
+at_atten = 0.7299  # ATLAS orange band (less host contamination)
+as_atten = 0.36    # ASAS-SN V-band
+
+print(f"  ZTF (r-band):     {ztf_atten:.3f} (heavily diluted by host)")
+print(f"  ATLAS (o-band):   {at_atten:.4f} (moderate host contribution)")
+print(f"  ASAS-SN (V-band): {as_atten:.2f}")
+print()
+
+# Summary values [flux, uncertainty] in mJy
+ztf_2021 = [0.881, 0.0069]  # mJy
+ztf_2022 = [0.83, 0.0012]   # mJy
+at_2021 = [17.86/1000, 4.32/1000]  # Convert μJy to mJy
+at_2022 = [0.75/1000, 5.83/1000]   # Convert μJy to mJy
+as_2021 = [1.036, 0.033]    # mJy
+as_2022 = [0.955, 0.17]     # mJy
+
+print("Corrected AGN fluxes (F_AGN = F_observed / attenuation_factor):")
+print("-" * 70)
+print(f"{'Telescope':<12} {'Year':<6} {'Observed (mJy)':<20} {'Corrected AGN (mJy)':<25}")
+print("-" * 70)
+
+ztf_2021_corr = np.array(ztf_2021) / ztf_atten
+ztf_2022_corr = np.array(ztf_2022) / ztf_atten
+at_2021_corr = np.array(at_2021) / at_atten
+at_2022_corr = np.array(at_2022) / at_atten
+as_2021_corr = np.array(as_2021) / as_atten
+as_2022_corr = np.array(as_2022) / as_atten
+
+print(f"{'ZTF':<12} {'2021':<6} {ztf_2021[0]:.4f} ± {ztf_2021[1]:.4f}       {ztf_2021_corr[0]:.4f} ± {ztf_2021_corr[1]:.4f}")
+print(f"{'ZTF':<12} {'2022':<6} {ztf_2022[0]:.4f} ± {ztf_2022[1]:.4f}       {ztf_2022_corr[0]:.4f} ± {ztf_2022_corr[1]:.4f}")
+print(f"{'ATLAS':<12} {'2021':<6} {at_2021[0]:.5f} ± {at_2021[1]:.5f}     {at_2021_corr[0]:.5f} ± {at_2021_corr[1]:.5f}")
+print(f"{'ATLAS':<12} {'2022':<6} {at_2022[0]:.5f} ± {at_2022[1]:.5f}     {at_2022_corr[0]:.5f} ± {at_2022_corr[1]:.5f}")
+print(f"{'ASAS-SN':<12} {'2021':<6} {as_2021[0]:.3f} ± {as_2021[1]:.3f}         {as_2021_corr[0]:.4f} ± {as_2021_corr[1]:.4f}")
+print(f"{'ASAS-SN':<12} {'2022':<6} {as_2022[0]:.3f} ± {as_2022[1]:.2f}          {as_2022_corr[0]:.4f} ± {as_2022_corr[1]:.4f}")
+print("-" * 70)
+print()
+print("Note: The corrected flux represents the intrinsic AGN flux after")
+print("      removing the diluting effect of host galaxy light.")

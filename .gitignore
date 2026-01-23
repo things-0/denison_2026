@@ -5,5 +5,6 @@ oli/meeting_notes/*
 oli/papers/*
 oli/ssp_reports/*
 oli/data/*
+oli/shaun_code/*
 .DS_Store
 .vscode/*
