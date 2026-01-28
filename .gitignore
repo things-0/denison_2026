@@ -1,11 +1,12 @@
-shaun/Data/*
-shaun/Readings/*
-oli/info/*
-oli/meeting_notes/*
-oli/papers/*
-oli/ssp_reports/*
-oli/data/*
-oli/shaun_code/*
+shaun/Readings/
+oli/info/
+oli/meeting_notes/
+oli/papers/
+oli/ssp_reports/
+oli/shaun_code/
+# oli/old_stuff/
+Data/
+data/
 __pycache__/
 .DS_Store
 .vscode/
