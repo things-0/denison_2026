@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 # Try to import my_emcee module
 try:
-    from my_emcee import fit_gaussians
+    from AI_code.my_emcee import fit_gaussians
     EMCEE_AVAILABLE = True
 except ImportError:
     EMCEE_AVAILABLE = False
