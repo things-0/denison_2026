@@ -6,5 +6,6 @@ oli/papers/*
 oli/ssp_reports/*
 oli/data/*
 oli/shaun_code/*
+oli/__pycache__/*
 .DS_Store
 .vscode/*
