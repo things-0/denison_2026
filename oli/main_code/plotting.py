@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 from matplotlib.colors import Colormap
 
 from .constants import *
-from .helpers import get_lam_bounds, convert_lam_to_vel
+from .helpers import get_lam_bounds, convert_lam_to_vel, convert_to_vel_data, get_flux_bounds
 
 def plot_vert_emission_lines(
     ions: dict[str, float] | None, 
@@ -13,6 +14,7 @@ def plot_vert_emission_lines(
     fill_between_opacity: float = 0.5,
     vlines_cmap: Colormap | None = plt.cm.tab10,
     is_rest_frame: bool = True,
+    vel_centre_ang: float | None = None
 ) -> None:
     plt.xlim(plot_x_bounds)
     if ions is None:
@@ -22,9 +24,13 @@ def plot_vert_emission_lines(
             obs_lam = lam * (1+Z_SPEC)
         else:
             obs_lam = lam
+        if vel_centre_ang is None:
+            x_val = obs_lam
+        else:
+            x_val = convert_lam_to_vel(obs_lam, lam_centre_rest_frame=vel_centre_ang)
         if plot_x_bounds is None or (plot_x_bounds[0] < obs_lam < plot_x_bounds[1]):
             plt.axvline(
-                obs_lam, linestyle='--', lw=LINEWIDTH,
+                x_val, linestyle='--', lw=LINEWIDTH,
                 color=vlines_cmap(i), label=name
             )
     if fill_between_bounds is not None:
@@ -119,13 +125,16 @@ def plot_spectra(
 
     plt.figure(figsize=FIG_SIZE)
     plt.plot(lam01, flux01, color='black', label='2001 (SDSS)', lw = LINEWIDTH)
+
     if sami_is_split:
         flux15_blue, flux15_red = flux15
         lam15_blue, lam15_red = lam15
+
         plt.plot(lam15_blue, flux15_blue, color='blue', label='2015 blue arm (SAMI)', lw = LINEWIDTH)
         plt.plot(lam15_red, flux15_red, color='red', label='2015 red arm (SAMI)', lw = LINEWIDTH)
     else:
         plt.plot(lam15, flux15, color='purple', label='2015 (SAMI)', lw = LINEWIDTH)
+
     plt.plot(lam21, flux21, color='orange', label='2021 (SDSS)', lw = LINEWIDTH)
     plt.plot(lam22, flux22, color='green', label='2022 (SDSS)', lw = LINEWIDTH)
 
@@ -151,29 +160,16 @@ def plot_spectra(
         fill_between_opacity=fill_between_opacity
     )
     
-    max_flux = max(
-        np.nanmax(flux01),
-        np.nanmax(flux15),
-        np.nanmax(flux21),
-        np.nanmax(flux22)
-    )
-    min_flux = min(
-        np.nanmin(flux01),
-        np.nanmin(flux15),
-        np.nanmin(flux21),
-        np.nanmin(flux22)
-    )
-    total_range = max_flux - min_flux
-    smallest_range = min(
-        np.nanmax(flux01) - np.nanmin(flux01),
-        np.nanmax(flux15) - np.nanmin(flux15),
-        np.nanmax(flux21) - np.nanmin(flux21),
-        np.nanmax(flux22) - np.nanmin(flux22)
-    )
     if y_bounds is not None:
         plt.ylim(y_bounds)
-    elif total_range > 10 * smallest_range:
-        plt.ylim((0, 1.2 * smallest_range))
+    else:
+        min_flux, smallest_range, total_range = get_flux_bounds(
+            lam01, lam15, lam21, lam22,
+            flux01, flux15, flux21, flux22,
+            x_bounds
+        )
+        if total_range > 5 * smallest_range:
+            plt.ylim((min_flux / 1.2, min_flux + 1.2 * smallest_range))
 
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
@@ -254,84 +250,137 @@ def plot_adjusted_spectrum(
 
 def plot_diff_spectra(
     lam: np.ndarray,
-    years_to_plot: list[int] = [2015, 2021, 2022],
+    # years_to_plot: list[int] = [2015, 2021, 2022],
     diff_15: np.ndarray | None = None,
     diff_21: np.ndarray | None = None,
     diff_22: np.ndarray | None = None,
     diff_15_err: np.ndarray | None = None,
     diff_21_err: np.ndarray | None = None,
     diff_22_err: np.ndarray | None = None,
-    ions: dict[str, float] | bool = True,
-    plot_centre: float | list[float] = H_ALPHA,
+    ions: dict[str, float] | bool = False,
+    plot_centres: float | list[float] = [H_ALPHA, H_BETA],
+    plot_labels: list[str] | None = [r"H-${\alpha}$", r"H-${\beta}$"],
     vel_plot_width: float | None = VEL_PLOT_WIDTH,
     use_ang_x_axis: bool = False,
     plot_y_bounds: tuple[float, float] | bool = True,
-    plot_errors: bool = False,
     error_opacity: float = ERR_OPAC,
+    colour_map: Colormap | None = plt.cm.tab10,
 ) -> None:
 
-    if not isinstance(plot_centre, list):
-        plot_centre = [plot_centre]
+    if isinstance(plot_centres, list) and plot_labels is not None and len(plot_centres) != len(plot_labels):
+        raise ValueError("plot_centres and plot_labels must have the same length and correspond to each other")
+    if not isinstance(plot_centres, list) and isinstance(plot_labels, list) and len(plot_labels) != 1:
+        raise ValueError("plot_labels must be a list of length 1 if plot_centres is just a number")
 
-    #TODO: add support for using velocity on the x-axis
+    num_centres = len(plot_centres) if isinstance(plot_centres, list) else 1
+    if plot_labels is None:
+        plot_labels = [""] * num_centres
+
     if use_ang_x_axis:
+        if isinstance(plot_centres, list):
+            raise ValueError("plot_centres must be a single number if use_ang_x_axis is True")
+
         x_axis_label = "Wavelength (Å)"
-        x = lam
+        x_15, x_21, x_22 = [lam], [lam], [lam]
+        diffs_15 = [diff_15] if diff_15 is not None else None
+        diffs_21 = [diff_21] if diff_21 is not None else None
+        diffs_22 = [diff_22] if diff_22 is not None else None
+        diffs_15_err = [diff_15_err] if diff_15_err is not None else None
+        diffs_21_err = [diff_21_err] if diff_21_err is not None else None
+        diffs_22_err = [diff_22_err] if diff_22_err is not None else None
     else:
         x_axis_label = "Velocity (km/s)"
-        for centre in plot_centre:
-            x = convert_lam_to_vel(lam, centre)
-    
-    #TODO: add support for multiple plot centres
-
-
+        x_15, diffs_15, diffs_15_err = convert_to_vel_data(
+            lam, diff_15, diff_15_err, plot_centres, vel_plot_width
+        )
+        x_21, diffs_21, diffs_21_err = convert_to_vel_data(
+            lam, diff_21, diff_21_err, plot_centres, vel_plot_width
+        )
+        x_22, diffs_22, diffs_22_err = convert_to_vel_data(
+            lam, diff_22, diff_22_err, plot_centres, vel_plot_width
+        )
 
 
     plt.figure(figsize=FIG_SIZE)
-    if 2015 in years_to_plot and diff_15 is not None:
-        plt.plot(lam, diff_15, alpha=0.7, color='black', label=f'2015 - 2001', lw = LINEWIDTH)
-    if 2021 in years_to_plot and diff_21 is not None:
-        plt.plot(lam, diff_21, alpha=0.7, color='red', label=f'2021 - 2001', lw = LINEWIDTH)
-    if 2022 in years_to_plot and diff_22 is not None:
-        plt.plot(lam, diff_22, alpha=0.7, color='blue', label=f'2022 - 2001', lw = LINEWIDTH)
-        
+    for i in range(num_centres):
+        if diffs_15 is not None:
+            label_info = plot_labels[i]
+            flux = diffs_15[i]
+            flux_err = diffs_15_err[i] if diffs_15_err is not None else None
+            colour_15 = colour_map(3*i) if num_centres > 1 else 'black'
+            plt.plot(x_15[i], flux, alpha=0.7, color=colour_15, label=f'{label_info} 2015 - 2001', lw = LINEWIDTH)
+            
+            if flux_err is not None:
+                plt.fill_between(x_15[i], flux - flux_err, flux + flux_err, color=colour_15, alpha=error_opacity)
+        if diffs_21 is not None:
+            label_info = plot_labels[i]
+            flux = diffs_21[i]
+            flux_err = diffs_21_err[i] if diffs_21_err is not None else None
+            colour_21 = colour_map(3*i+1) if num_centres > 1 else 'red'
+            plt.plot(x_21[i], flux, alpha=0.7, color='red', label=f'{label_info} 2021 - 2001', lw = LINEWIDTH)
+            
+            if flux_err is not None:
+                plt.fill_between(x_21[i], flux - flux_err, flux + flux_err, color=colour_21, alpha=error_opacity)
+        if diffs_22 is not None:
+            label_info = plot_labels[i]
+            flux = diffs_22[i]
+            flux_err = diffs_22_err[i] if diffs_22_err is not None else None
+            colour_22 = colour_map(3*i+2) if num_centres > 1 else 'blue'
+            plt.plot(x_22[i], flux, alpha=0.7, color=colour_22, label=f'{label_info} 2022 - 2001', lw = LINEWIDTH)
+            
+            if flux_err is not None:
+                plt.fill_between(x_22[i], flux - flux_err, flux + flux_err, color=colour_22, alpha=error_opacity)
+
     there_are_ions_to_plot = True
     if isinstance(ions, bool):
         if ions:
-            if plot_centre == H_ALPHA:
-                ions = {r"H-${\alpha}$": H_ALPHA, "S[II] (1)": SII_1, "S[II] (2)": SII_2, "N[II] (2)": NII_2}
-            elif plot_centre == H_BETA:
-                ions = {r"H-${\beta}$": H_BETA, "O[III] (1)": OIII_1, "O[III] (2)": OIII_2}
+            ions_near_h_alpha = {r"H-${\alpha}$": H_ALPHA, "S[II] (1)": SII_1, "S[II] (2)": SII_2, "N[II] (2)": NII_2}
+            ions_near_h_beta = {r"H-${\beta}$": H_BETA, "O[III] (1)": OIII_1, "O[III] (2)": OIII_2}
+            if isinstance(plot_centres, list):
+                ions = {}
+                if H_ALPHA in plot_centres:
+                    ions = ions | ions_near_h_alpha
+                if H_BETA in plot_centres:
+                    ions = ions | ions_near_h_beta
             else:
-                there_are_ions_to_plot = False
+                if plot_centres == H_ALPHA:
+                    ions = ions_near_h_alpha
+                elif plot_centres == H_BETA:
+                    ions = ions_near_h_beta
+                else:
+                    there_are_ions_to_plot = False
         else:
             there_are_ions_to_plot = False
 
-    x_bounds = get_lam_bounds(plot_centre, vel_plot_width, width_is_vel=True) if vel_plot_width is not None else None
-
-    if plot_errors:
-        if 2015 in years_to_plot and diff_15_err is not None:
-            plt.fill_between(lam, diff_15 - diff_15_err, diff_15 + diff_15_err, color='black', alpha=error_opacity)
-        if 2021 in years_to_plot and diff_21_err is not None:
-            plt.fill_between(lam, diff_21 - diff_21_err, diff_21 + diff_21_err, color='red', alpha=error_opacity)
-        if 2022 in years_to_plot and diff_22_err is not None:
-            plt.fill_between(lam, diff_22 - diff_22_err, diff_22 + diff_22_err, color='blue', alpha=error_opacity)
-
-
+    if use_ang_x_axis:        
+        x_bounds = get_lam_bounds(plot_centres, vel_plot_width, width_is_vel=True) if vel_plot_width is not None else None
+        vel_centre_ang = None
+    else:
+        vel_centre_ang = plot_centres[0] if isinstance(plot_centres, list) else plot_centres
+        x_bounds = (-vel_plot_width / 2, vel_plot_width / 2) if vel_plot_width is not None else None
+        
     if there_are_ions_to_plot:
-        plot_vert_emission_lines(ions, x_bounds)
+        plot_vert_emission_lines(ions, x_bounds, vel_centre_ang=vel_centre_ang)
+        if not use_ang_x_axis and num_centres > 1:
+            warn_msg = (
+                f"\nEmission lines only plotted with respect to {plot_labels[0]}."
+            )
+            warnings.warn(warn_msg)
     elif x_bounds is not None:
         plt.xlim(x_bounds)
 
     if isinstance(plot_y_bounds, tuple):
         plt.ylim(plot_y_bounds[0], plot_y_bounds[1])
     elif plot_y_bounds:
-        if plot_centre == H_ALPHA:
+        if not isinstance(plot_centres, list):
+            if plot_centres == H_ALPHA:
+                plt.ylim(-10, 30)
+            elif plot_centres == H_BETA:
+                plt.ylim(-10, 20)
+        else:
             plt.ylim(-10, 30)
-        elif plot_centre == H_BETA:
-            plt.ylim(-10, 20)
 
-    plt.xlabel("Wavelength (Å)")
+    plt.xlabel(x_axis_label)
     plt.ylabel(SFD_Y_AX_LABEL)
     plt.title(f"Spectral flux density difference from 2001")
     plt.legend()

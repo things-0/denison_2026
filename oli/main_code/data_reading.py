@@ -100,8 +100,10 @@ def get_adjusted_data(
     plot_just_resampled: bool = False,
     plot_resampled_and_blurred: bool = True,
     plot_errors: bool = False,
-    final_plot_xlim: tuple[float, float] | None = None,
-    final_plot_vlines: dict[str, float] | None = None,
+    blurred_xlim: tuple[float, float] | None = None,
+    resampled_xlim: tuple[float, float] | None = None,
+    resampled_and_blurred_xlim: tuple[float, float] | None = None,
+    resampled_and_blurred_vlines: dict[str, float] | None = None,
     sdss_folder_name: str = SDSS_FOLDER_NAME,
     sami_folder_name: str = SAMI_FOLDER_NAME,
     fname_2001: str = FNAME_2001,
@@ -247,7 +249,8 @@ def get_adjusted_data(
                 flux15_err=(err15_blue_clipped, err15_red),
                 flux21_err=err21,
                 flux22_err=err22,
-                title="Spectra from 2001 to 2022 (blurred before resampling)"
+                title="Spectra from 2001 to 2022 (blurred before resampling)",
+                x_bounds=blurred_xlim
             )
                 
         flux01_blurred_resampled, err01_resampled = flux01_blurred, err01
@@ -305,7 +308,7 @@ def get_adjusted_data(
         if plot_just_resampled:
             plot_spectra(
                 lam01,
-                lam01,
+                (lam01, lam01),
                 lam01,
                 lam01,
                 flux01_resampled,
@@ -317,7 +320,8 @@ def get_adjusted_data(
                 flux15_err=(err15_blue_resampled, err15_red_resampled),
                 flux21_err=err21_resampled,
                 flux22_err=err22_resampled,
-                title="Spectra from 2001 to 2022 (resampled to 2001 grid)"
+                title="Spectra from 2001 to 2022 (resampled to 2001 grid)",
+                x_bounds=resampled_xlim
             )
 
         wavelength_step = np.median(np.diff(lam01))
@@ -365,8 +369,8 @@ def get_adjusted_data(
             flux21_err=data21[1],
             flux22_err=data22[1],
             title="Spectra from 2001 to 2022 (blurred then resampled to 2001 grid)",
-            ions=final_plot_vlines,
-            x_bounds=final_plot_xlim
+            ions=resampled_and_blurred_vlines,
+            x_bounds=resampled_and_blurred_xlim
         )
 
     return lam01, (data01, data15, data21, data22)
