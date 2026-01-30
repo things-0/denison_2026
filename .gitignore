@@ -5,6 +5,7 @@ oli/papers/
 oli/ssp_reports/
 oli/shaun_code/
 # oli/old_stuff/
+oli/output/
 Data/
 data/
 __pycache__/

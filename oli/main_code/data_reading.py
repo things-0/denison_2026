@@ -238,7 +238,7 @@ def get_adjusted_data(
                 x_bounds=clipped_xlim
             )
             #TD: remove testing
-            print(f"SAMI 2015 mean red flux error: {np.nanmean(err15_red)}")
+            # print(f"SAMI 2015 mean red flux error: {np.nanmean(err15_red)}")
             #
         
         flux01_blurred = gaussian_blur_before_resampling(res_min, res_01, lam01, lam01, flux01)

@@ -14,7 +14,7 @@ def get_polynom_fit(
     bin_by_med: bool = True, plot_result: bool = True,
 ) -> tuple[np.poly1d, np.ndarray]:
     if bin_by_med:
-        binned_lambdas, binned_vals = bin_data_by_median(lambdas, vals, bin_width)
+        binned_lambdas, binned_vals, binned_val_errs = bin_data_by_median(lambdas, vals, bin_width)
         new_vals, new_lambdas = binned_vals, binned_lambdas
     else:
         binned_lambdas, binned_vals = None, None

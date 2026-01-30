@@ -41,7 +41,7 @@ def gaussian_blur_before_resampling(
     sigma_high_res_arr = (lam_high_res / high_res) / 2.355
 
     #TD: remove testing
-    diffs = np.diff(lam_high_res)
+    # diffs = np.diff(lam_high_res)
     # print(f"Min step: {diffs.min()}, Max step: {diffs.max()}, Std/Mean: {diffs.std()/diffs.mean()}")
     n_smoothed = 0
     n_ignored = 0
@@ -72,7 +72,7 @@ def gaussian_blur_before_resampling(
             sigma_high_res_median = np.median(sigma_high_res_chunk)
 
             #TD: remove testing
-            diffs = np.diff(lam_high_res_chunk)
+            # diffs = np.diff(lam_high_res_chunk)
             # print(f"\nChunk {i+1}\nMin step: {diffs.min()}, Max step: {diffs.max()}, Std/Mean: {diffs.std()/diffs.mean()}")
             #
 

@@ -69,7 +69,10 @@ def get_min_res(
 
     return res_min
 
-def bin_data_by_median(x: np.ndarray, y: np.ndarray, bin_width: float) -> tuple[np.ndarray, np.ndarray]:
+def bin_data_by_median(
+    x: np.ndarray, y: np.ndarray, bin_width: float,
+    y_errs: np.ndarray | None = None
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
     step_size = np.median(np.diff(x))
 
     points_per_bin = int(bin_width / step_size)
@@ -86,7 +89,14 @@ def bin_data_by_median(x: np.ndarray, y: np.ndarray, bin_width: float) -> tuple[
     x_binned = np.median(x_2d, axis=1)
     y_binned = np.median(y_2d, axis=1)
 
-    return x_binned, y_binned
+    if y_errs is not None:
+        y_errs_trimmed = y_errs[:n_points_to_keep]
+        y_errs_2d = y_errs_trimmed.reshape(n_complete_bins, points_per_bin)
+        y_errs_binned = np.median(y_errs_2d, axis=1)
+    else:
+        y_errs_binned = None
+
+    return x_binned, y_binned, y_errs_binned
 
 def convert_to_vel_data(
     lam: np.ndarray,
@@ -270,14 +280,20 @@ def get_vel_lam_mask(
 
 def get_masked_diffs(
     x: np.ndarray,
-    mask: np.ndarray
+    mask: np.ndarray | None,
+    reduce_endpoint_weights: bool = True
 ) -> np.ndarray:
     diffs = np.diff(x)
-    extended_diffs = np.zeros(len(x)+1)
-    extended_diffs[1:-1] = diffs
-    extended_diffs[0] = diffs[0]
-    extended_diffs[-1] = diffs[-1]
-    av_diffs = (extended_diffs[:-1] + extended_diffs[1:]) / 2
+    av_diffs = np.zeros_like(x)
+    av_diffs[1:] += diffs / 2
+    av_diffs[:-1] += diffs / 2
+
+    if not reduce_endpoint_weights:
+        av_diffs[0] = av_diffs[0] * 2
+        av_diffs[-1] = av_diffs[-1] * 2
+
+    if mask is None:
+        mask = np.ones(len(x), dtype=bool)
     return av_diffs[mask]
 
 def get_default_bounds(
@@ -304,3 +320,123 @@ def get_default_bounds(
         [sigma_max] * num_of_gaussians
     )
     return lower_bounds, upper_bounds
+
+def pretty_print_flux_comparison(
+    flux_alpha_21: float,
+    flux_alpha_21_err: float,
+    num_gaussians_alpha_21: int,
+    flux_alpha_22: float,
+    flux_alpha_22_err: float,
+    num_gaussians_alpha_22: int,
+    flux_beta_21: float,
+    flux_beta_21_err: float,
+    num_gaussians_beta_21: int,
+    flux_beta_22: float,
+    flux_beta_22_err: float,
+    num_gaussians_beta_22: int
+) -> str:
+
+    flux_alpha_assasn_g_21_mjy = convert_flux_to_mJy(flux_beta_21, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
+    flux_alpha_assasn_g_21_mjy_err = convert_flux_to_mJy(flux_beta_21_err, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
+    flux_alpha_atlas_o_21_mjy = convert_flux_to_mJy(flux_alpha_21, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
+    flux_alpha_atlas_o_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
+    flux_alpha_ztf_r_21_mjy = convert_flux_to_mJy(flux_alpha_21, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
+    flux_alpha_ztf_r_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
+
+    flux_alpha_assasn_g_22_mjy = convert_flux_to_mJy(flux_beta_22, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
+    flux_alpha_assasn_g_22_mjy_err = convert_flux_to_mJy(flux_beta_22_err, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
+    flux_alpha_atlas_o_22_mjy = convert_flux_to_mJy(flux_alpha_22, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
+    flux_alpha_atlas_o_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
+    flux_alpha_ztf_r_22_mjy = convert_flux_to_mJy(flux_alpha_22, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
+    flux_alpha_ztf_r_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
+
+    survey_names = (
+        "ASASSN g band 2021 (Hβ)",
+        "ASASSN g band 2022 (Hβ)",
+        "Atlas o band 2021 (Hα)",
+        "Atlas o band 2022 (Hα)",
+        "ZTF r band 2021 (Hα)",
+        "ZTF r band 2022 (Hα)"
+    )
+    int_flux_vals = [
+        [flux_alpha_assasn_g_21_mjy, flux_alpha_assasn_g_21_mjy_err],
+        [flux_alpha_assasn_g_22_mjy, flux_alpha_assasn_g_22_mjy_err],
+        [flux_alpha_atlas_o_21_mjy, flux_alpha_atlas_o_21_mjy_err],
+        [flux_alpha_atlas_o_22_mjy, flux_alpha_atlas_o_22_mjy_err],
+        [flux_alpha_ztf_r_21_mjy, flux_alpha_ztf_r_21_mjy_err],
+        [flux_alpha_ztf_r_22_mjy, flux_alpha_ztf_r_22_mjy_err]
+    ]
+    num_gaussians_vals = (
+        num_gaussians_beta_21,      # ASASSN g band 2021
+        num_gaussians_beta_22,      # ASASSN g band 2022
+        num_gaussians_alpha_21,     # Atlas o band 2021
+        num_gaussians_alpha_22,     # Atlas o band 2022
+        num_gaussians_alpha_21,     # ZTF r band 2021
+        num_gaussians_alpha_22      # ZTF r band 2022
+    )
+    photometric_flux_vals = [
+        ASASSN_G_FLUX_21,
+        ASASSN_G_FLUX_22,
+        ATLAS_O_FLUX_21, 
+        ATLAS_O_FLUX_22,
+        ZTF_R_FLUX_21,
+        ZTF_R_FLUX_22
+    ]
+
+    int_flux_vals_micro_jy = np.array(int_flux_vals) * 1e3
+    photometric_flux_vals_micro_jy = np.array(photometric_flux_vals) * 1e3
+ 
+    # Column headers (in desired order)
+    headers = [
+        "Survey",
+        "Attenuated Photometric Flux (μJy)",
+        "Integrated Spectroscopic Flux (μJy)",
+        "Number of Gaussians used to integrate"
+    ]
+
+    # Build rows data (in same order as headers)
+    rows = []
+    for i, name in enumerate(survey_names):
+        flux_val = int_flux_vals_micro_jy[i][0]
+        flux_err = int_flux_vals_micro_jy[i][1]
+        n_gauss = num_gaussians_vals[i]
+        phot_flux = photometric_flux_vals_micro_jy[i]
+
+        rows.append([
+            name,
+            f"{phot_flux: .4f}",                    # Space for sign alignment
+            f"({flux_val:.3f} ± {flux_err:.3f})",
+            str(n_gauss)
+        ])
+
+    # Calculate column widths based on headers and data
+    col_widths = []
+    for col_idx in range(len(headers)):
+        header_len = len(headers[col_idx])
+        data_lens = [len(row[col_idx]) for row in rows]
+        col_widths.append(max(header_len, *data_lens))
+
+    # Build format string
+    def make_row(values, widths, alignments):
+        parts = []
+        for val, w, align in zip(values, widths, alignments):
+            if align == "center":
+                parts.append(f"{val:^{w}}")
+            elif align == "right":
+                parts.append(f"{val:>{w}}")
+            else:  # left
+                parts.append(f"{val:<{w}}")
+        return " | ".join(parts)
+
+    # Alignments for each column
+    alignments = ["left", "left", "left", "center"]
+
+    table_width = sum(col_widths) + 3 * len(col_widths) - 1  # " | " between columns
+
+    # Print table
+    print("=" * table_width)
+    print(make_row(headers, col_widths, alignments))
+    print("-" * table_width)
+    for row in rows:
+        print(make_row(row, col_widths, alignments))
+    print("=" * table_width)

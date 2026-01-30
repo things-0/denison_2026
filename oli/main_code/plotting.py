@@ -408,6 +408,7 @@ def plot_gaussians(
     title: str | None = None,
     mask_vel_width: float | None = VEL_PLOT_WIDTH,
     mask_lam_centre: float | None = None,
+    red_chi_sq: float | None = None
 ) -> None:
     if mask_vel_width is not None:
         if mask_lam_centre is None:
@@ -419,7 +420,7 @@ def plot_gaussians(
 
     plt.figure(figsize=FIG_SIZE)
     plt.plot(x, y_data, color='black', label='Data', lw = LINEWIDTH)
-    plt.plot(x, summed_gaussian_vals, color='red', label='Total Gaussian fit', lw = LINEWIDTH)
+    plt.plot(x, summed_gaussian_vals, color='red', label='Total Gaussian fit', lw = 2*LINEWIDTH)
     if summed_gaussian_errs is not None:
         plt.fill_between(
             x, summed_gaussian_vals - summed_gaussian_errs,
@@ -438,9 +439,77 @@ def plot_gaussians(
             color=colour_map(i), label=f'Gaussian {i+1}',
             linestyle='--', lw = LINEWIDTH
         )
+    if red_chi_sq is not None:
+        label = r"Reduced $\chi^2$ = "
+        label += f"{red_chi_sq:.2f}"
+        plt.text(
+            0.05, 0.95, label,
+            transform=plt.gca().transAxes,
+            fontsize=12, verticalalignment='top'
+        )
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
     if title is not None:
         plt.title(title)
     plt.legend()
     plt.show()
+
+
+
+
+def compare_balmer_decrements(
+    results: list[list[dict[str, np.ndarray]]],
+    num_gaussians_list: list[int],
+    num_bins_list: list[int],
+    year: int,
+    colour_map: Colormap = COLOUR_MAP
+) -> None:
+    # Usage:
+    # Get results for num_gaussians=2, num_bins=5:
+    ng_idx = num_gaussians_list.index(2)
+    nb_idx = num_bins_list.index(5)
+    data = results[ng_idx][nb_idx]
+    print(data['bd'], data['vel_centres'])
+
+
+
+
+def compare_balmer_decrements(
+    balmer_decrements_0_bins: np.ndarray,
+    balmer_decrements_many_bins: np.ndarray,
+    vel_bin_centres_all: np.ndarray,
+    year: int,
+    num_bins_bounds: tuple[int, int] = (1, 7),
+    num_gaussians_bounds: tuple[int, int] = (0, 5),
+    colour_map: Colormap = COLOUR_MAP
+) -> None:
+
+    num_bins_range = range(num_bins_bounds[0], num_bins_bounds[1] + 1)
+    num_gaussians_range = range(num_gaussians_bounds[0], num_gaussians_bounds[1] + 1)
+    print(f"num_bins_range: {num_bins_range}")
+    print(f"num_gaussians_range: {num_gaussians_range}")
+
+    plt.plot(num_gaussians_range, balmer_decrements_0_bins, color='black', label='0 bins', lw = LINEWIDTH)
+    plt.xlabel("Number of Gaussians")
+    plt.ylabel("Balmer Decrement")
+    plt.title(f"{year} Balmer Decrement vs Number of Gaussians")
+    plt.show()
+
+    # for > 0 num_bins, plot the balmer decrement on the y axis vs the velocity on the x axis, 
+    # with multiple dashed lines for each number of gaussians
+    
+    for num_bins in num_bins_range:
+        for num_gaussians in num_gaussians_range:
+            plt.plot(
+                vel_bin_centres_all[num_gaussians],
+                balmer_decrements_many_bins[num_gaussians],
+                color=colour_map(num_gaussians),
+                label=f'{num_gaussians} gaussians',
+                linestyle='--',
+                lw = LINEWIDTH
+            )
+        plt.xlabel(VEL_LABEL)
+        plt.ylabel("Balmer Decrement")
+        plt.title(f"{year} Balmer Decrement vs Velocity ({num_bins} bins)")
+        plt.legend()
+        plt.show()

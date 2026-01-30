@@ -2,285 +2,256 @@ import numpy as np
 import warnings
 
 from .constants import *
+from .helpers import convert_vel_to_lam, get_vel_lam_mask, get_masked_diffs
+from .gaussian_fitting import fit_gaussians
 
-# def integrate_flux(
+def integrate_flux(
+    lam: np.ndarray,
+    spec_flux_density: np.ndarray,
+    spec_flux_density_err: np.ndarray,
+    lam_bounds: tuple[float, float],
+    num_gaussians: int = 0,
+    lam_centre: float | None = None,
+    n_mc_trials: int = NUM_MC_TRIALS,
+    plot_gaussians: bool = True, #TODO: change back to False
+    # plot_gaussians: bool = False,
+    title: str | None = None
+) -> tuple[float, float]:
+
+    valid_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(lam)))
+    lam_trimmed = lam[valid_mask]
+    sfd_trimmed = spec_flux_density[valid_mask]
+    sfd_err_trimmed = spec_flux_density_err[valid_mask]
+
+    if num_gaussians > 0:
+        if lam_centre is None:
+            raise ValueError("lam_centre must be provided if num_gaussians > 0")
+        gauss_sfd_vals, gauss_sfd_errs, _, _, _, _ = fit_gaussians(
+            lam_trimmed, sfd_trimmed, sfd_err_trimmed,
+            num_gaussians=num_gaussians,
+            mask_vel_width=None,
+            mask_lam_centre=lam_centre,
+            n_trials=n_mc_trials,
+            plot_fit=plot_gaussians,
+            title=title
+        )
+        y = gauss_sfd_vals
+        y_err = gauss_sfd_errs
+    else:
+        y = sfd_trimmed
+        y_err = sfd_err_trimmed
+    
+    x = lam_trimmed
+
+    flux = np.trapezoid(y, x=x)
+    err_weights = get_masked_diffs(x, mask=None)
+    flux_err = np.sqrt(np.sum((err_weights * y_err)**2))
+
+    return flux, flux_err
+
+def calculate_balmer_decrement(
+    lam: np.ndarray,
+    sfd_diff: np.ndarray,
+    sfd_diff_err: np.ndarray,
+    vel_calculation_width: float = VEL_TO_IGNORE_WIDTH,
+    vel_plot_width: float = VEL_PLOT_WIDTH,
+    num_gaussians: int = DEFAULT_NUM_GAUSSIANS,
+    n_mc_trials: int = NUM_MC_TRIALS,
+    num_bins: int = 1,
+    plot_curves: bool = True, #TODO: create a new plotting function for this
+    year: int | str = "",
+) -> tuple[float, float]:
+    bin_width = vel_calculation_width / num_bins
+
+    if num_gaussians > 0:
+        gauss_sfd_diff_alpha_vals, gauss_sfd_diff_alpha_errs, _, _, _, _ = fit_gaussians(
+            lam, sfd_diff, sfd_diff_err,
+            num_gaussians=num_gaussians,
+            mask_vel_width=vel_plot_width,
+            mask_lam_centre=H_ALPHA,
+            n_trials=n_mc_trials,
+            plot_fit=plot_curves,
+            title=f"{year} Hα flux difference from 2001"
+        )
+        gauss_sfd_diff_beta_vals, gauss_sfd_diff_beta_errs, _, _, _, _ = fit_gaussians(
+            lam, sfd_diff, sfd_diff_err,
+            num_gaussians=num_gaussians,
+            mask_vel_width=vel_plot_width,
+            mask_lam_centre=H_BETA,
+            n_trials=n_mc_trials,
+            plot_fit=plot_curves,
+            title=f"{year} Hβ flux difference from 2001"
+        )
+        y_alpha = gauss_sfd_diff_alpha_vals
+        y_alpha_err = gauss_sfd_diff_alpha_errs
+        y_beta = gauss_sfd_diff_beta_vals
+        y_beta_err = gauss_sfd_diff_beta_errs
+    else:
+        y_alpha = sfd_diff
+        y_alpha_err = sfd_diff_err
+        y_beta = sfd_diff
+        y_beta_err = sfd_diff_err
+
+    x_alpha = lam[get_vel_lam_mask(lam, vel_plot_width, H_ALPHA)]
+    x_beta = lam[get_vel_lam_mask(lam, vel_plot_width, H_BETA)]
+
+    balmer_decrements = []
+    balmer_decrements_err = []
+    vel_bin_centres = []
+
+    for i in range(num_bins):
+        vel_left = -vel_calculation_width / 2 + i * bin_width
+        vel_centre = vel_left + bin_width / 2
+        vel_right = vel_left + bin_width
+
+        cur_lam_bounds_alpha = (convert_vel_to_lam(vel_left, H_ALPHA), convert_vel_to_lam(vel_right, H_ALPHA))
+        cur_lam_bounds_beta = (convert_vel_to_lam(vel_left, H_BETA), convert_vel_to_lam(vel_right, H_BETA))
+
+        h_alpha_flux, h_alpha_flux_err = integrate_flux(x_alpha, y_alpha, y_alpha_err, cur_lam_bounds_alpha)
+        h_beta_flux, h_beta_flux_err = integrate_flux(x_beta, y_beta, y_beta_err, cur_lam_bounds_beta)
+
+        cur_balmer_decrement = h_alpha_flux / h_beta_flux
+        cur_balmer_decrement_err = cur_balmer_decrement * np.sqrt(
+            (h_alpha_flux_err / h_alpha_flux)**2 + 
+            (h_beta_flux_err / h_beta_flux)**2
+        )
+
+        balmer_decrements_err.append(cur_balmer_decrement_err)
+        balmer_decrements.append(cur_balmer_decrement)
+
+        vel_bin_centres.append(vel_centre)
+
+    return np.array(balmer_decrements), np.array(balmer_decrements_err), np.array(vel_bin_centres)
+
+# def get_bd_comparison_info(
 #     lam: np.ndarray,
-#     spec_flux_density: np.ndarray,
-#     spec_flux_density_err: np.ndarray,
-#     lam_bounds: tuple[float, float],
-#     n_gaussians: int = 0,
-#     n_trials: int = 6,  # Monte Carlo samples #TODO: change back to 1000
-#     plot_fit: bool = False,
-#     calc_err: bool = True,
-#     title_info: str = "",
-#     peak_min_sigma_threshold: float = 2.9,
-#     idx_dist_between_peaks: int = 3,
-#     print_progress: bool = False,
-#     find_peak_min_width_kms: float | None = FIND_PEAK_MIN_WIDTH_KMS,
-#     find_peak_min_width_ang: float | None = None,
-#     # find_peak_min_width_idx: int | None = FIND_PEAK_MIN_WIDTH_IDX,
-#     min_amp_std: float = 1.0
-# ) -> tuple[float, float]:
+#     sfd_diff: np.ndarray,
+#     sfd_diff_err: np.ndarray,
+#     num_bins_bounds: tuple[int, int],
+#     num_gaussians_bounds: tuple[int, int],
+#     vel_calculation_width: float,
+#     vel_plot_width: float,
+#     n_mc_trials: int
+# ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
-#     valid_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(lam)))
-#     x = lam[valid_mask]
-#     y = spec_flux_density[valid_mask]
-#     sig = spec_flux_density_err[valid_mask]
-#     sig[sig == 0] = np.min(sig[sig > 0])  # avoid division by zero
-#     weights = 1.0 / sig
-    
-#     #TODO: run bayesian or mc to find best starting params? (might be a bit overkill)
-#     #TODO: make plots with varying params and show Scott
-
-#     if n_gaussians > 0:
-#         if find_peak_min_width_ang is None:
-#             if find_peak_min_width_kms is None:
-#                 min_fwhm = 0
-#                 warn_msg = (
-#                     f"\nboth find_peak_min_width_ang and find_peak_min_width_kms are None.\n"
-#                     f"Setting min_fwhm (minimum dispersion width of peaks) to 0"
-#                 )
-#                 warnings.warn(warn_msg, UserWarning)
-#             lam_cent_rest = np.mean(lam_bounds) / (1 + z)
-#             min_fwhm = (
-#                 convert_vel_to_lam(find_peak_min_width_kms/2, lam_cent_rest) -
-#                 convert_vel_to_lam(-find_peak_min_width_kms/2, lam_cent_rest)
-#             )
-#         elif find_peak_min_width_kms is None:
-#             min_fwhm = find_peak_min_width_ang
-#         else:
-#             raise ValueError("find_peak_min_width_ang and find_peak_min_width_kms cannot both be provided")
-        
-
-#         max_fwhm = (x[-1] - x[0])
-
-#         max_height = np.max(y) + np.std(y)
-#         min_height = np.std(y) * min_amp_std
-
-#         min_mu = x[np.argwhere(y > np.std(y)*1.5)[0][0]]
-#         max_mu = x[np.argwhere(y > np.std(y)*1.5)[-1][0]]
-
-#     if emcee_fit:
-#         if n_gaussians < 1:
-#             raise ValueError("emcee_fit requires at least one Gaussian")
-
-
-#         result = fit_gaussians(
-#             x, y, sig,
-#             n_gaussians=2,
-#             # Constraints
-#             min_fwhm=min_fwhm,           # Minimum FWHM in Å
-#             max_fwhm=max_fwhm,         # Maximum FWHM
-#             min_peak_height=min_height,    # Minimum peak height
-#             max_peak_height=max_height,    # Maximum peak height
-#             # MCMC settings
-#             # nwalkers=50,
-#             # nsteps=5000,
-#             # burnin=1000,
-#             # Plotting
-#             plot_corner=True,       # Corner plot of posteriors
-#             plot_fit=True,          # Fit vs data plot
-#             plot_chains=True,       # MCMC chains (for convergence)
-#             progress=True,          # Print progress
-#             title=f"{title_info}Difference Spectrum"
-#         )
-
-#         print(result)
-
-#         flux, flux_err = result.flux, result.flux_err
-
-#     elif n_gaussians > 0:
-
-#         # 1. Detect peaks and estimate initial params
-#         highest_peak_sigma = (np.max(y) - np.mean(y)) / np.std(y)
-#         if highest_peak_sigma < peak_min_sigma_threshold:
-#             warn_msg = (
-#                 f"\nhighest peak is less than {peak_min_sigma_threshold} "
-#                 f"sigma above mean (only {highest_peak_sigma:.2f} sigma above).\n"
-#                 f"Setting peak_min_sigma_threshold to {highest_peak_sigma:.2f}"
-#             )
-#             warnings.warn(warn_msg, UserWarning)
-#             peak_min_sigma_threshold = highest_peak_sigma * 0.99
-
-#         #TODO: set all to central wavelength (as a starting guess)
-#         peak_indices, properties = sps.find_peaks(  #TODO: set min dispersion width and/or smooth first
-#             y, distance = idx_dist_between_peaks,
-#             height = np.std(y) * peak_min_sigma_threshold + np.mean(y)
-#             # width = min_width #TODO: put back in
-#         )
-#         if len(peak_indices) < n_gaussians:
-#             warn_msg = f"\nonly {len(peak_indices)} peaks found, expected {n_gaussians}"
-#             warnings.warn(warn_msg, UserWarning)
-        
-#         peak_indices = peak_indices[:n_gaussians]
-#         mu_guesses = x[peak_indices]
-#         peak_height_guesses = y[peak_indices]
-#         # amp_guesses = properties["peak_heights"][peak_indices]
-#         idx_width_at_half_max_guesses, _, _, _ = peak_widths(y, peak_indices, rel_height=0.5) # returns width in indices at half max
-#         dx_med = np.median(np.diff(x))
-#         fwhm_guesses = idx_width_at_half_max_guesses * dx_med
-#         sigma_guesses = fwhm_guesses / SIGMA_TO_FWHM
-
-#         # 2. Build multi-Gaussian model
-#         model, params = None, None
-#         for i, (height, mu, sigma) in enumerate(
-#             zip(peak_height_guesses, mu_guesses, sigma_guesses)
-#         ):
-#             prefix = f"Gaussian_model_{i+1}_"
-#             g = GaussianModel(prefix=prefix)
-#             if model is None:
-#                 model, params = g, g.make_params()
-#             else:
-#                 model += g
-#                 params.update(g.make_params())
-#             #TODO: check these values
-
-#             max_fwhm = (x[-1] - x[0])
-
-#             min_sig = min_fwhm / SIGMA_TO_FWHM 
-#             max_sig = max_fwhm / SIGMA_TO_FWHM
-
-#             min_height_to_amp = np.sqrt(2*np.pi)*min_sig
-#             height_to_amp = np.sqrt(2*np.pi)*sigma
-#             max_height_to_amp = np.sqrt(2*np.pi)*max_sig
-
-#             max_height = np.max(y) + np.std(y)
-#             min_height = np.std(y) * min_amp_std
-            
-#             max_amp = max_height*max_height_to_amp
-#             min_amp = min_height*max_height_to_amp
-#             # min_amp = min_height*min_height_to_amp
-#             # min_amp = min_height*height_to_amp
-#             # max_amp = max_height*height_to_amp
-
-#             min_mu = x[np.argwhere(y > np.std(y)*1.5)[0][0]]
-#             max_mu = x[np.argwhere(y > np.std(y)*1.5)[-1][0]]
-#             #
-
-#             params[prefix+'amplitude'].set(
-#                 value=height*height_to_amp,
-#                 min=min_amp,
-#                 max=max_amp
-#             )
-#             params[prefix+'center'].set(
-#                 value=mu, min=min_mu,
-#                 max=max_mu
-#             )
-#             params[prefix+'sigma'].set(
-#                 value=sigma, min=min_sig,
-#                 max=max_sig
-#             )
-
-#             #TD: remove testing
-#             # print(f"{prefix} height bounds: ({min_height}, {max_height}) {SFD_UNITS_NOT_LATEX}")
-#             # print(f"{prefix} amplitude bounds: ({min_amp}, {max_amp}) {SFD_UNITS_NOT_LATEX}")
-#             # print(f"{prefix} FWHM bounds: ({min_fwhm:.2f}, {max_fwhm:.2f}) Å")
-#             # print(f"{prefix} mu bounds: ({min_mu:.2f}, {max_mu:.2f}) Å")
-
-#             # print(f"(before fitting) peak height for {prefix}: {(params[prefix+'amplitude'].value / (params[prefix+'sigma'].value * np.sqrt(2 * np.pi))):.2f} {SFD_UNITS_NOT_LATEX}")
-#             # print(f"(before fitting) amplitude for {prefix}: {(params[prefix+'amplitude'].value):.2f} {SFD_UNITS_NOT_LATEX}")
-#             # print(f"(before fitting) FWHM for {prefix}: {(params[prefix+'sigma'].value * SIGMA_TO_FWHM):.2f} Å")
-#             # print(f"(before fitting) mu for {prefix}: {(params[prefix+'center'].value):.2f} Å")
-#             #
-        
-#         result = model.fit(y, params, x=x, weights=weights)
-#         best_fit = result.best_fit
-
-
-#         flux = np.trapezoid(best_fit, x)
-
-#         #TD: remove testing
-#         for i, name in enumerate(result.eval_components(x=x).keys()):
-#             amp_fitted = result.params[name + 'amplitude'].value  # This is AREA
-#             sigma_fitted = result.params[name + 'sigma'].value
-#             mu_fitted = result.params[name + 'center'].value
-#             fwhm_fitted = sigma_fitted * SIGMA_TO_FWHM
-            
-#             # Calculate peak height
-#             peak_height = amp_fitted / (sigma_fitted * np.sqrt(2 * np.pi))
-            
-#             # print(f"(after fitting) peak height for {name}: {peak_height:.2f} {SFD_UNITS_NOT_LATEX}")
-#             # print(f"(after fitting) amplitude for {name}: {amp_fitted:.2f} {SFD_UNITS_NOT_LATEX}")
-#             # print(f"(after fitting) FWHM for {name}: {fwhm_fitted:.2f} Å")
-#             # print(f"(after fitting) mu for {name}: {mu_fitted:.2f} Å")
-#         #
-
-#         if not calc_err:
-#             if plot_fit:
-#                 raise ValueError("plot_fit must be False if calc_err is False")
-#             return flux
-
-#         # 3. Monte Carlo integration (Tyler's approach)
-#         flux_list = np.zeros(n_trials)
-#         for i in range(n_trials):
-#             y_perturbed = y + np.random.normal(0, sig)
-#             result_mc = model.fit(y_perturbed, params.copy(), x=x, weights=weights)
-#             flux_list[i] = np.trapezoid(result_mc.best_fit, x)
-#             if print_progress and i % (n_trials // 10) == 0:
-#                 print(f"MC trial {i} of {n_trials} completed")
-        
-#         flux_mc = np.mean(flux_list)
-        
-#         #TD: remove testing
-#         # print(f"{title_info}flux_mc: {flux_mc:.2f}")
-#         # print(f"{title_info}flux: {flux:.2f}")
-#         # print(f"{title_info}flux - flux_mc: {(flux - flux_mc):.3f}")
-#         #
-
-#         flux_err = np.std(flux_list)
-
-#         if plot_fit:
-#             redchisq = result.redchi    # lmfit stores reduced chisq here
-#             plt.figure(figsize=FIGURE_SIZE)
-#             plt.plot(x, y, label="Data", alpha=0.6)
-#             plt.plot(x, best_fit, 'r-', label="Total fit", linewidth= 4 * LINEWIDTH)
-
-#             # Plot each component separately
-#             for name, comp in result.eval_components(x=x).items():
-#                 plt.plot(x, comp, '--', label=name.strip("_"))
-
-#             # Plot uncertainty band (gray stripe)
-#             plt.fill_between(
-#                 x,
-#                 y - sig,
-#                 y + sig,
-#                 color="gray",
-#                 alpha=0.3,
-#                 label="Uncertainty"
-#             )
-#             plt.ylabel(SFD_Y_AX_LABEL)
-#             plt.xlabel(r"Wavelength ($\AA$)")
-#             plt.title(f"Multi-Gaussian Fit of {title_info}Difference Spectrum")
-                
-#             plt.text(
-#                 0.05, 0.95,         
-#                 f"Reduced χ² = {redchisq:.2f}",
-#                 transform=plt.gca().transAxes,
-#                 fontsize=12,
-#                 verticalalignment='top'
-#             )
-#             plt.legend(loc='upper right')
-#             plt.show()
-
+#     if num_bins_bounds[0] == 1:
+#         num_bins_range = range(2, num_bins_bounds[1] + 1)
 #     else:
-#         dx = np.diff(x)
-        
-#         flux = np.trapezoid(y, x=x)
-#         # flux = np.sum((flux[:-1] + flux[1:]) / 2 * dx)
+#         num_bins_range = range(num_bins_bounds[0], num_bins_bounds[1] + 1)
 
-#         if not calc_err:
-#             return flux
+#     num_gaussians_range = range(num_gaussians_bounds[0], num_gaussians_bounds[1] + 1)
 
-#         # Weights for interior points are 1.0 (0.5 from left trap + 0.5 from right trap)
-#         # Weights for endpoints are 0.5
+#     print(f"num_bins_range: {num_bins_range}")
+#     print(f"num_gaussians_range: {num_gaussians_range}")
+
+#     balmer_decrements_1_bin = []
+#     balmer_decrements_1_bin_err = []
+#     balmer_decrements_many_bins = []
+#     balmer_decrements_many_bins_err = []
+#     vel_bin_centres_all = []
+
+#     for num_gaussians in num_gaussians_range:
+#         balmer_decrement_1_bin_arr, balmer_decrement_1_bin_err_arr, _ = calculate_balmer_decrement(
+#             lam, sfd_diff, sfd_diff_err,
+#             num_bins=1,
+#             num_gaussians=num_gaussians,
+#             n_mc_trials=n_mc_trials,
+#             vel_calculation_width=vel_calculation_width,
+#             vel_plot_width=vel_plot_width,
+#             plot_curves=False
+#         )
+#         balmer_decrements_1_bin.append(balmer_decrement_1_bin_arr[0])
+#         balmer_decrements_1_bin_err.append(balmer_decrement_1_bin_err_arr[0])
         
-#         # General case for non-uniform spacing:
-#         # Each sigma_i is multiplied by (dx_{i-1} + dx_i) / 2
-#         err_weights = np.zeros_like(x)
-#         err_weights[1:] += dx / 2
-#         err_weights[:-1] += dx / 2
+#         one_gauss_results = []
+#         for num_bins in num_bins_range:
+#             balmer_decrement_many_bins, balmer_decrement_many_bins_err, vel_bin_centres = calculate_balmer_decrement(
+#                 lam, sfd_diff, sfd_diff_err,
+#                 num_bins=num_bins,
+#                 num_gaussians=num_gaussians,
+#                 n_mc_trials=n_mc_trials,
+#                 vel_calculation_width=vel_calculation_width,
+#                 vel_plot_width=vel_plot_width
+#             )
+#             one_gauss_results.append({
+#                 'bd': balmer_decrement_many_bins,
+#                 'bd_err': balmer_decrement_many_bins_err,
+#                 'vel_centres': vel_bin_centres,
+#                 'num_bins': num_bins,
+#                 'num_gaussians': num_gaussians
+#             })
+#             #TODO: add dimension rather than just appending all into one flat list
+#             # one_gauss_many_bins_bd.append(balmer_decrement_many_bins)
+#             # one_gauss_many_bins_bd_err.append(balmer_decrement_many_bins_err)
+#             # one_gauss_many_bins_vel_centres.append(vel_bin_centres)
+#         balmer_decrements_many_bins.append(one_gauss_many_bins_bd)
+#         balmer_decrements_many_bins_err.append(one_gauss_many_bins_bd_err)
+#         vel_bin_centres_all.append(one_gauss_many_bins_vel_centres)
         
-#         flux_err = np.sqrt(np.sum((err_weights * spec_flux_density_err[valid_mask])**2))
+#     return (
+#         (balmer_decrements_1_bin, balmer_decrements_1_bin_err),
+#         (balmer_decrements_many_bins.T, balmer_decrements_many_bins_err.T),
+#         vel_bin_centres_all.T
+#     )
+
+#     return (
+#         np.array(balmer_decrements_1_bin),
+#         np.array(balmer_decrements_many_bins),
+#         np.array(vel_bin_centres_all)
+#     )
+
+def get_bd_comparison_info(
+    lam: np.ndarray,
+    sfd_diff: np.ndarray,
+    sfd_diff_err: np.ndarray,
+    num_bins_bounds: tuple[int, int],
+    num_gaussians_bounds: tuple[int, int],
+    vel_calculation_width: float,
+    vel_plot_width: float,
+    n_mc_trials: int
+) -> tuple[list[list[dict[str, np.ndarray]]], list[int], list[int]]:
+    ...
     
-#     return flux, flux_err
+    # Store metadata for indexing
+    num_gaussians_list = list(range(
+        num_gaussians_bounds[0], num_gaussians_bounds[1] + 1
+    ))
+    num_bins_list = list(range(
+        num_bins_bounds[0], num_bins_bounds[1] + 1
+    ))
 
+    # Results: [num_gaussians_idx][num_bins_idx] -> (bd_arr, err_arr, vel_arr)
+    all_results = []
+    one_bin_results = []
+
+    for num_gaussians in num_gaussians_list:
+        one_gauss_results = []
+        
+        for num_bins in num_bins_list:
+            bd, bd_err, vel_centres = calculate_balmer_decrement(
+                lam, sfd_diff, sfd_diff_err,
+                num_bins=num_bins,
+                num_gaussians=num_gaussians,
+                n_mc_trials=n_mc_trials,
+                vel_calculation_width=vel_calculation_width,
+                vel_plot_width=vel_plot_width,
+                plot_curves=False
+            )
+            if num_bins == 1:
+                one_bin_results.append({
+                    'bd': bd[0],
+                    'bd_err': bd_err[0],
+                    'num_gaussians': num_gaussians
+                })
+            else:
+                one_gauss_results.append({
+                    'bd': bd,
+                    'bd_err': bd_err,
+                    'vel_centres': vel_centres,
+                    'num_bins': num_bins,
+                    'num_gaussians': num_gaussians
+                })
+        
+        all_results.append(one_gauss_results)
+
+    return all_results, num_gaussians_list, num_bins_list
