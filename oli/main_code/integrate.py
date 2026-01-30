@@ -49,6 +49,8 @@ def integrate_flux(
 
     return flux, flux_err
 
+#TODO: check bounds are correct for integration
+#TODO: check result for no gaussians and for num_bins > 2
 def calculate_balmer_decrement(
     lam: np.ndarray,
     sfd_diff: np.ndarray,
@@ -222,7 +224,7 @@ def get_bd_comparison_info(
 
     # Results: [num_gaussians_idx][num_bins_idx] -> (bd_arr, err_arr, vel_arr)
     all_results = []
-    one_bin_results = []
+    # one_bin_results = []
 
     for num_gaussians in num_gaussians_list:
         one_gauss_results = []
@@ -238,9 +240,11 @@ def get_bd_comparison_info(
                 plot_curves=False
             )
             if num_bins == 1:
-                one_bin_results.append({
+                one_gauss_results.append({
                     'bd': bd[0],
                     'bd_err': bd_err[0],
+                    'vel_centres': 0,
+                    'num_bins': 1,
                     'num_gaussians': num_gaussians
                 })
             else:

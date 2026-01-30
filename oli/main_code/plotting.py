@@ -466,15 +466,63 @@ def compare_balmer_decrements(
 ) -> None:
     # Usage:
     # Get results for num_gaussians=2, num_bins=5:
-    ng_idx = num_gaussians_list.index(2)
-    nb_idx = num_bins_list.index(5)
-    data = results[ng_idx][nb_idx]
-    print(data['bd'], data['vel_centres'])
+    # ng_idx = num_gaussians_list.index(2)
+    # nb_idx = num_bins_list.index(5)
+    # data = results[ng_idx][nb_idx]
+    # print(data['bd'], data['vel_centres'])
+
+    for i, num_bins in enumerate(num_bins_list):
+        if num_bins == 1:
+            one_bin_results = [result[i] for result in results]
+            plt.plot(
+                num_gaussians_list,
+                [result["bd"] for result in one_bin_results],
+                color='black',
+                marker='o',
+                lw = LINEWIDTH
+            )
+            plt.fill_between(
+                num_gaussians_list,
+                [result["bd"] - result["bd_err"] for result in one_bin_results],
+                [result["bd"] + result["bd_err"] for result in one_bin_results],
+                color='black',
+                alpha=ERR_OPAC
+            )
+            plt.xlabel("Number of Gaussians")
+            plt.ylabel("Balmer Decrement")
+            plt.ylim(0, 10)
+            plt.title(f"{year} Balmer Decrement vs Number of Gaussians (no binning)")
+            plt.show()
+            continue
+        
+        for j, num_gaussians in enumerate(num_gaussians_list):
+            plt.plot(
+                results[j][i]["vel_centres"],
+                results[j][i]["bd"],
+                color=colour_map(j),
+                label=f"{num_gaussians} gaussians",
+                linestyle='--',
+                marker='o',
+                lw = LINEWIDTH
+            )
+            plt.fill_between(
+                results[j][i]["vel_centres"],
+                results[j][i]["bd"] - results[j][i]["bd_err"],
+                results[j][i]["bd"] + results[j][i]["bd_err"],
+                color=colour_map(j),
+                alpha=ERR_OPAC
+            )
+        plt.xlabel(VEL_LABEL)
+        plt.ylabel("Balmer Decrement")
+        plt.ylim(0, 10)
+        plt.title(f"{year} Balmer Decrement vs Velocity ({num_bins} bins)")
+        plt.legend()
+        plt.show()
 
 
 
 
-def compare_balmer_decrements(
+def compare_balmer_decrements_old(
     balmer_decrements_0_bins: np.ndarray,
     balmer_decrements_many_bins: np.ndarray,
     vel_bin_centres_all: np.ndarray,
