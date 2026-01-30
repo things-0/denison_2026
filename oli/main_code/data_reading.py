@@ -100,6 +100,8 @@ def get_adjusted_data(
     plot_just_resampled: bool = False,
     plot_resampled_and_blurred: bool = True,
     plot_errors: bool = False,
+    as_is_xlim: tuple[float, float] | None = None,
+    clipped_xlim: tuple[float, float] | None = None,
     blurred_xlim: tuple[float, float] | None = None,
     resampled_xlim: tuple[float, float] | None = None,
     resampled_and_blurred_xlim: tuple[float, float] | None = None,
@@ -132,6 +134,12 @@ def get_adjusted_data(
     """
     Get the flux, wavelength, and variance arrays for the spectra.
     """
+    plot_as_is = plot_as_is or as_is_xlim is not None
+    plot_clipped = plot_clipped or clipped_xlim is not None
+    plot_just_blurred = plot_just_blurred or blurred_xlim is not None
+    plot_just_resampled = plot_just_resampled or resampled_xlim is not None
+    plot_resampled_and_blurred = plot_resampled_and_blurred or resampled_and_blurred_xlim is not None
+    
     flux01, lam01, ivar01 = sdss_read(sdss_folder_name + fname_2001, return_wresl=False) # 2001 file
     flux21, lam21, ivar21, fwhm21 = sdss_read(sdss_folder_name + fname_2021) # 2021 file
     flux22, lam22, ivar22, fwhm22 = sdss_read(sdss_folder_name + fname_2022) # 2022 file
@@ -185,7 +193,8 @@ def get_adjusted_data(
             (flux15_blue, flux15_red),
             flux21,
             flux22,
-            title="Spectra from 2001 to 2022 (as is)"
+            title="Spectra from 2001 to 2022 (as is)",
+            x_bounds=as_is_xlim
         )
 
     err01 = np.sqrt(var01)
@@ -225,8 +234,12 @@ def get_adjusted_data(
                 flux15_err=(err15_blue_clipped, err15_red),
                 flux21_err=err21,
                 flux22_err=err22,
-                title=f"Spectra from 2001 to 2022 (SAMI clipped to ~{min_ssd_lam:.0f} Å)"
+                title=f"Spectra from 2001 to 2022 (SAMI clipped to ~{min_ssd_lam:.0f} Å)",
+                x_bounds=clipped_xlim
             )
+            #TD: remove testing
+            print(f"SAMI 2015 mean red flux error: {np.nanmean(err15_red)}")
+            #
         
         flux01_blurred = gaussian_blur_before_resampling(res_min, res_01, lam01, lam01, flux01)
         flux21_blurred = gaussian_blur_before_resampling(res_min, res_21, lam01, lam21, flux21)
@@ -288,6 +301,8 @@ def get_adjusted_data(
         data15 = (flux15_blurred_resampled, err15_resampled)
         data21 = (flux21_blurred_resampled, err21_resampled)
         data22 = (flux22_blurred_resampled, err22_resampled)
+
+        resampled_and_blurred_title = "Spectra from 2001 to 2022 (blurred then resampled to 2001 grid)"
 
     else:
         flux01_resampled, err01_resampled = flux01, err01
@@ -353,6 +368,8 @@ def get_adjusted_data(
         data21 = (flux21_resampled_blurred, err21_resampled)
         data22 = (flux22_resampled_blurred, err22_resampled)
 
+        resampled_and_blurred_title = "Spectra from 2001 to 2022 (resampled to 2001 grid then blurred)"
+
     if plot_resampled_and_blurred:
         plot_spectra(
             lam01,
@@ -368,7 +385,7 @@ def get_adjusted_data(
             flux15_err=data15[1],
             flux21_err=data21[1],
             flux22_err=data22[1],
-            title="Spectra from 2001 to 2022 (blurred then resampled to 2001 grid)",
+            title=resampled_and_blurred_title,
             ions=resampled_and_blurred_vlines,
             x_bounds=resampled_and_blurred_xlim
         )

@@ -1,10 +1,14 @@
+from matplotlib.pylab import plot
 import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 from matplotlib.colors import Colormap
 
 from .constants import *
-from .helpers import get_lam_bounds, convert_lam_to_vel, convert_to_vel_data, get_flux_bounds
+from .helpers import (
+    get_lam_bounds, convert_lam_to_vel, convert_to_vel_data,
+    get_flux_bounds, get_vel_lam_mask
+)
 
 def plot_vert_emission_lines(
     ions: dict[str, float] | None, 
@@ -12,11 +16,17 @@ def plot_vert_emission_lines(
     fill_between_bounds: tuple[float, float] | None = None,
     fill_between_label: str | None = None,
     fill_between_opacity: float = 0.5,
-    vlines_cmap: Colormap | None = plt.cm.tab10,
+    vlines_cmap: Colormap = COLOUR_MAP,
     is_rest_frame: bool = True,
     vel_centre_ang: float | None = None
 ) -> None:
     plt.xlim(plot_x_bounds)
+    if fill_between_bounds is not None:
+        plt.axvspan(
+            fill_between_bounds[0], fill_between_bounds[1],
+            color='lightgrey', alpha=fill_between_opacity,
+            label=fill_between_label
+        )
     if ions is None:
         return
     for i, (name, lam) in enumerate(ions.items()):
@@ -33,20 +43,7 @@ def plot_vert_emission_lines(
                 x_val, linestyle='--', lw=LINEWIDTH,
                 color=vlines_cmap(i), label=name
             )
-    if fill_between_bounds is not None:
-        if fill_between_label is None:
-            plt.axvspan(
-                fill_between_bounds[0],
-                fill_between_bounds[1],
-                color='lightgrey', alpha=fill_between_opacity
-            )
-        else:
-            plt.axvspan(
-                fill_between_bounds[0],
-                fill_between_bounds[1],
-                color='lightgrey', alpha=fill_between_opacity,
-                label=fill_between_label
-            )
+
 
 def plot_min_res(
     lam01: np.ndarray,
@@ -89,7 +86,7 @@ def plot_min_res(
     plt.plot(lam01, res_min, color='black', alpha=0.5, lw=4, linestyle='--', label="Minimum")
     plt.fill_betweenx(res_plot_bounds, lam15_blue_min, lam15_blue_max, color='lightblue', alpha=0.5, label="SAMI blue coverage")
     plt.fill_betweenx(res_plot_bounds, lam15_red_min, lam15_red_max, color='red', alpha=0.2, label="SAMI red coverage")
-    plt.xlabel("Wavelength (Å)")
+    plt.xlabel(ANG_LABEL)
     plt.ylabel("Resolving Power")
     plt.title("Resolution of SDSS spectra")
     plt.legend()
@@ -111,7 +108,7 @@ def plot_spectra(
     flux22_err: np.ndarray | None = None,
     title: str | None = None,
     y_axis_label: str = SFD_Y_AX_LABEL,
-    x_axis_label: str = "Wavelength (Å)",
+    x_axis_label: str = ANG_LABEL,
     error_opacity: float = ERR_OPAC,
     ions: dict[str, float] | None = None,
     x_bounds: tuple[float, float] | None = None,
@@ -210,7 +207,7 @@ def plot_polynomial_ratio(
         plt.plot(binned_lambdas, polynom_vals, color='red', label=poly_label, lw=4*LINEWIDTH)
 
     plt.plot(lambdas, vals, alpha=0.5, color='black', label=ratio_label, lw = LINEWIDTH)
-    plt.xlabel("Wavelength (Å)")
+    plt.xlabel(ANG_LABEL)
     plt.ylabel("Ratio")
     plt.title(title)
     plt.legend()
@@ -232,7 +229,7 @@ def plot_adjusted_spectrum(
     plt.plot(lam, baseline_flux, color='black', label=f'{baseline_year}', lw = LINEWIDTH)
     plt.plot(lam, unadjusted_flux, color='orange', label=f'{year_to_adjust}', lw = LINEWIDTH)
     plt.plot(lam, adjusted_flux, color='red', label=f'{year_to_adjust} (polynomial fit to {baseline_year})', lw = LINEWIDTH)
-    plt.xlabel("Wavelength (Å)")
+    plt.xlabel(ANG_LABEL)
     plt.ylabel(SFD_Y_AX_LABEL)
 
     plot_vert_emission_lines(ions, lam_bounds)
@@ -258,13 +255,17 @@ def plot_diff_spectra(
     diff_21_err: np.ndarray | None = None,
     diff_22_err: np.ndarray | None = None,
     ions: dict[str, float] | bool = False,
+    vel_plot_width: float | None = VEL_PLOT_WIDTH,
+    hlines: dict[str, float] | None = None,
+    fill_between_bounds: tuple[float, float] | None = None,
+    fill_between_label: str | None = None,
+    fill_between_opacity: float = FILL_BETWEEN_OPAC,
     plot_centres: float | list[float] = [H_ALPHA, H_BETA],
     plot_labels: list[str] | None = [r"H-${\alpha}$", r"H-${\beta}$"],
-    vel_plot_width: float | None = VEL_PLOT_WIDTH,
     use_ang_x_axis: bool = False,
     plot_y_bounds: tuple[float, float] | bool = True,
     error_opacity: float = ERR_OPAC,
-    colour_map: Colormap | None = plt.cm.tab10,
+    colour_map: Colormap = COLOUR_MAP,
 ) -> None:
 
     if isinstance(plot_centres, list) and plot_labels is not None and len(plot_centres) != len(plot_labels):
@@ -280,7 +281,7 @@ def plot_diff_spectra(
         if isinstance(plot_centres, list):
             raise ValueError("plot_centres must be a single number if use_ang_x_axis is True")
 
-        x_axis_label = "Wavelength (Å)"
+        x_axis_label = ANG_LABEL
         x_15, x_21, x_22 = [lam], [lam], [lam]
         diffs_15 = [diff_15] if diff_15 is not None else None
         diffs_21 = [diff_21] if diff_21 is not None else None
@@ -289,7 +290,7 @@ def plot_diff_spectra(
         diffs_21_err = [diff_21_err] if diff_21_err is not None else None
         diffs_22_err = [diff_22_err] if diff_22_err is not None else None
     else:
-        x_axis_label = "Velocity (km/s)"
+        x_axis_label = VEL_LABEL
         x_15, diffs_15, diffs_15_err = convert_to_vel_data(
             lam, diff_15, diff_15_err, plot_centres, vel_plot_width
         )
@@ -348,9 +349,9 @@ def plot_diff_spectra(
                 elif plot_centres == H_BETA:
                     ions = ions_near_h_beta
                 else:
-                    there_are_ions_to_plot = False
+                    ions = None
         else:
-            there_are_ions_to_plot = False
+            ions = None
 
     if use_ang_x_axis:        
         x_bounds = get_lam_bounds(plot_centres, vel_plot_width, width_is_vel=True) if vel_plot_width is not None else None
@@ -359,15 +360,22 @@ def plot_diff_spectra(
         vel_centre_ang = plot_centres[0] if isinstance(plot_centres, list) else plot_centres
         x_bounds = (-vel_plot_width / 2, vel_plot_width / 2) if vel_plot_width is not None else None
         
-    if there_are_ions_to_plot:
-        plot_vert_emission_lines(ions, x_bounds, vel_centre_ang=vel_centre_ang)
-        if not use_ang_x_axis and num_centres > 1:
-            warn_msg = (
-                f"\nEmission lines only plotted with respect to {plot_labels[0]}."
-            )
-            warnings.warn(warn_msg)
-    elif x_bounds is not None:
-        plt.xlim(x_bounds)
+
+    plot_vert_emission_lines(
+        ions, x_bounds, vel_centre_ang=vel_centre_ang,
+        fill_between_bounds=fill_between_bounds,
+        fill_between_label=fill_between_label,
+        fill_between_opacity=fill_between_opacity
+    )
+    if ions is not None and not use_ang_x_axis and num_centres > 1:
+        warn_msg = (
+            f"\nEmission lines only plotted with respect to {plot_labels[0]}."
+        )
+        warnings.warn(warn_msg)
+
+    if hlines is not None:
+        for i, (name, val) in enumerate(hlines.items()):
+            plt.axhline(val, color=colour_map(i), linestyle='--', lw=LINEWIDTH, label=name)
 
     if isinstance(plot_y_bounds, tuple):
         plt.ylim(plot_y_bounds[0], plot_y_bounds[1])
@@ -383,5 +391,56 @@ def plot_diff_spectra(
     plt.xlabel(x_axis_label)
     plt.ylabel(SFD_Y_AX_LABEL)
     plt.title(f"Spectral flux density difference from 2001")
+    plt.legend()
+    plt.show()
+
+def plot_gaussians(
+    x: np.ndarray,
+    y_data: np.ndarray,
+    sep_gaussian_vals: np.ndarray[np.ndarray],
+    summed_gaussian_vals: np.ndarray,
+    y_data_errs: np.ndarray | None = None,
+    summed_gaussian_errs: np.ndarray | None = None,
+    colour_map: Colormap = COLOUR_MAP,
+    error_opacity: float = ERR_OPAC,
+    y_axis_label: str = SFD_Y_AX_LABEL,
+    x_axis_label: str = VEL_LABEL,
+    title: str | None = None,
+    mask_vel_width: float | None = VEL_PLOT_WIDTH,
+    mask_lam_centre: float | None = None,
+) -> None:
+    if mask_vel_width is not None:
+        if mask_lam_centre is None:
+            raise ValueError("mask_lam_centre must be provided if mask_vel_width is provided")
+        mask = get_vel_lam_mask(x, mask_vel_width, mask_lam_centre)
+        x = x[mask]
+        y_data = y_data[mask]
+        y_data_errs = y_data_errs[mask] if y_data_errs is not None else None
+
+    plt.figure(figsize=FIG_SIZE)
+    plt.plot(x, y_data, color='black', label='Data', lw = LINEWIDTH)
+    plt.plot(x, summed_gaussian_vals, color='red', label='Total Gaussian fit', lw = LINEWIDTH)
+    if summed_gaussian_errs is not None:
+        plt.fill_between(
+            x, summed_gaussian_vals - summed_gaussian_errs,
+            summed_gaussian_vals + summed_gaussian_errs,
+            color='red', alpha=error_opacity
+        )
+    if y_data_errs is not None:
+        plt.fill_between(
+            x, y_data - y_data_errs,
+            y_data + y_data_errs,
+            color='black', alpha=error_opacity
+        )
+    for i in range(len(sep_gaussian_vals)):
+        plt.plot(
+            x, sep_gaussian_vals[i],
+            color=colour_map(i), label=f'Gaussian {i+1}',
+            linestyle='--', lw = LINEWIDTH
+        )
+    plt.xlabel(x_axis_label)
+    plt.ylabel(y_axis_label)
+    if title is not None:
+        plt.title(title)
     plt.legend()
     plt.show()

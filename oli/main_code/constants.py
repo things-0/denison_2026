@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 Z_SPEC = 0.0582 # for spectroscopy
 Z_LUM = 0.05938
@@ -36,24 +37,29 @@ C_ANG_S = 2.99792458e18 # Ang/s
 
 SIGMA_TO_FWHM = 2 * np.sqrt(2 * np.log(2))
 EPS = 1e-8
-# LAMBDAS_TO_IGNORE_WIDTH = 180
-VEL_TO_IGNORE_WIDTH = 7000
-# FIND_PEAK_MIN_WIDTH_KMS = 1000
-# FIND_PEAK_MIN_WIDTH_ANG = 15
-VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
+NUM_MC_TRIALS = 1000
 
-# to remove?
-# FIND_PEAK_MIN_WIDTH_IDX = 7
-# BALMER_DECREMENT_VEL_WIDTH = 4000
+VEL_TO_IGNORE_WIDTH = 7000
+
+# Gaussian fitting parameters
+MAXFEV = 2100 # default is 1600
+MIN_MU = 1/5 # of total range of x plus minimum x value
+PEAK_MIN_RANGE = 1/35 # of total range of x - decrease for sharper peaks
+HEIGHT_MIN = 0
+HEIGHT_MAX = 10
+DEFAULT_NUM_GAUSSIANS = 2
 
 #TD: remove testing
 SMOOTH_FACTOR = 1.0
 #
 
 # Plotting parameters
+VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
 LINEWIDTH = 0.5
 FIG_SIZE = (10,4)
 ERR_OPAC = 0.1
+FILL_BETWEEN_OPAC = 0.5
+COLOUR_MAP = plt.cm.tab10
 
 
 SDSS_FOLDER_NAME = "data/sami323854/sdss_data/"
@@ -69,6 +75,8 @@ FNAME_2015_RED_3_ARCSEC = "323854_A_spectrum_3-arcsec_red.fits"
 FNAME_2015_BLUE_4_ARCSEC = "323854_A_spectrum_4-arcsec_blue.fits"
 FNAME_2015_RED_4_ARCSEC = "323854_A_spectrum_4-arcsec_red.fits"
 
+VEL_LABEL = r"Velocity (km$\text{s}^{-1}$)"
+ANG_LABEL = r"Wavelength ($\AA$)"
 SFD_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻² Å⁻¹"
 FLUX_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻²"
 FLUX_UNITS = r"$10^{-17}$ erg $\text{s}^{-1}$ $\text{cm}^{-2}$"
