@@ -86,12 +86,12 @@ def fit_gaussians(
     y_untrimmed: np.ndarray,
     y_errs_untrimmed: np.ndarray | None = None,
     num_gaussians: int = DEFAULT_NUM_GAUSSIANS,
-    n_trials: int = NUM_MC_TRIALS,
+    n_mc_trials: int = NUM_MC_TRIALS,
     max_func_ev: int = MAXFEV,
     lower_bounds: list[float] | None = None,
     upper_bounds: list[float] | None = None,
     set_bounds_to_default: bool = True,
-    mask_vel_width: float | None = VEL_PLOT_WIDTH,
+    mask_vel_width: float | None = VEL_WIDTH_GAUSSIAN_FIT,
     mask_lam_centre: float | None = None,
     use_best_fit_params_for_mc: bool = False, # faster and less accurate (smaller) errors if True
     plot_fit: bool = True, #TODO: change back to False
@@ -101,7 +101,7 @@ def fit_gaussians(
     colour_map: Colormap = COLOUR_MAP,
     error_opacity: float = ERR_OPAC,
     y_axis_label: str = SFD_Y_AX_LABEL,
-    x_axis_label: str = VEL_LABEL,
+    x_axis_label: str = ANG_LABEL,
     title: str | None = None
 ) -> tuple[
     np.ndarray, np.ndarray | None,
@@ -158,58 +158,6 @@ def fit_gaussians(
     
     param_errs = (np.sqrt(np.diag(param_cov_matrix))).reshape(3, num_gaussians)
     height_errs, mu_errs, sigma_errs = param_errs
-    
-    #region testing
-    # relative_errs = np.abs(np.concatenate((height_errs, mu_errs, sigma_errs)) / np.concatenate((heights, mus, sigmas)))
-    # if np.any(relative_errs > 1.0):
-    #     new_bin_width = np.median(np.diff(x)) * 2
-    #     warn_msg = (
-    #         "\nWARNING: Fit poorly constrained, uncertainties unreliable\n" +
-    #         # f"Relative errors: {relative_errs}\n" +
-    #         # f"Best fit params: {best_fit_params}\n" +
-    #         # f"Param errors: {param_errs}\n\n" +
-    #         f"Trying again with binned data (bin width = {new_bin_width} Å)"
-    #     )
-    #     warnings.warn(warn_msg)
-    #     new_x, new_y, new_y_errs = bin_data_by_median(
-    #         x=x,
-    #         y=y,
-    #         bin_width=new_bin_width,
-    #         y_errs=y_errs
-    #     )
-    #     print(f"Old x shape: {x.shape}")
-    #     print(f"New x shape: {new_x.shape}")
-    #     print(f"Old y shape: {y.shape}")
-    #     print(f"New y shape: {new_y.shape}")
-    #     plot_diff_spectra(
-    #         new_x,
-    #         new_y
-    #     )
-    #     return fit_gaussians(
-    #         new_x,
-    #         new_y,
-    #         new_y_errs,
-    #         num_gaussians=num_gaussians,
-    #         n_trials=n_trials,
-    #         max_func_ev=max_func_ev,
-    #         lower_bounds=lower_bounds,
-    #         upper_bounds=upper_bounds,
-    #         set_bounds_to_default=set_bounds_to_default,
-    #         mask_vel_width=mask_vel_width,
-    #         mask_lam_centre=mask_lam_centre,
-    #         plot_fit=plot_fit,
-    #         plot_y_errs=plot_y_errs,
-    #         plot_summed_gaussian_errs=plot_summed_gaussian_errs,
-    #         colour_map=colour_map,
-    #         error_opacity=error_opacity,
-    #         y_axis_label=y_axis_label,
-    #         x_axis_label=x_axis_label,
-    #         title=title
-    #     )
-    # for i in range(num_gaussians):
-    #     print(f"Peak {i+1} best fit: A={heights[i]:.2f}, μ={mus[i]:.2f}, σ={sigmas[i]:.2f}")
-    #     print(f"Peak {i+1} param errors: A={height_errs[i]:.2f}, μ={mu_errs[i]:.2f}, σ={sigma_errs[i]:.2f}")
-    #endregion
 
     summed_y_vals = calculate_n_gaussians_func(x, *best_fit_params)
     sep_y_vals = calculate_n_gaussians_func_sep(x, *best_fit_params)
@@ -244,11 +192,11 @@ def fit_gaussians(
             y=y,
             y_errs=y_errs,
             num_gaussians=num_gaussians,
-            initial_params=mc_init_params, #TODO: use best fit params for first trial instead?
+            initial_params=mc_init_params,
             max_func_ev=max_func_ev,
             lower_bounds=lower_bounds,
             upper_bounds=upper_bounds,
-            n_trials=n_trials,
+            n_mc_trials=n_mc_trials,
             best_fit_y=summed_y_vals
         )
 
@@ -286,14 +234,14 @@ def get_mc_errs_perturb_y(
     lower_bounds: list[float],
     upper_bounds: list[float],
     best_fit_y: np.ndarray,
-    n_trials: int = NUM_MC_TRIALS,
+    n_mc_trials: int = NUM_MC_TRIALS,
 ) -> np.ndarray:
     
     calculate_n_gaussians_func = get_gaussian_func(num_gaussians)
     
     fitted_y_samples = []
     
-    for _ in range(n_trials):
+    for _ in range(n_mc_trials):
         y_perturbed = y + np.random.normal(0, y_errs)
         
         try:

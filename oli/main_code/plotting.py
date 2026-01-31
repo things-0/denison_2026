@@ -474,14 +474,14 @@ def compare_balmer_decrements(
     for i, num_bins in enumerate(num_bins_list):
         if num_bins == 1:
             one_bin_results = [result[i] for result in results]
-            plt.plot(
+            plt.plot( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
                 num_gaussians_list,
                 [result["bd"] for result in one_bin_results],
                 color='black',
                 marker='o',
                 lw = LINEWIDTH
             )
-            plt.fill_between(
+            plt.fill_between( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
                 num_gaussians_list,
                 [result["bd"] - result["bd_err"] for result in one_bin_results],
                 [result["bd"] + result["bd_err"] for result in one_bin_results],
@@ -496,16 +496,16 @@ def compare_balmer_decrements(
             continue
         
         for j, num_gaussians in enumerate(num_gaussians_list):
-            plt.plot(
+            plt.plot( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
                 results[j][i]["vel_centres"],
                 results[j][i]["bd"],
                 color=colour_map(j),
                 label=f"{num_gaussians} gaussians",
-                linestyle='--',
+                linestyle="None",
                 marker='o',
                 lw = LINEWIDTH
             )
-            plt.fill_between(
+            plt.fill_between( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
                 results[j][i]["vel_centres"],
                 results[j][i]["bd"] - results[j][i]["bd_err"],
                 results[j][i]["bd"] + results[j][i]["bd_err"],
@@ -553,7 +553,7 @@ def compare_balmer_decrements_old(
                 balmer_decrements_many_bins[num_gaussians],
                 color=colour_map(num_gaussians),
                 label=f'{num_gaussians} gaussians',
-                linestyle='--',
+                linestyle='None',
                 lw = LINEWIDTH
             )
         plt.xlabel(VEL_LABEL)

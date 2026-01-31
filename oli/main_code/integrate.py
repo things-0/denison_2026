@@ -11,6 +11,7 @@ def integrate_flux(
     spec_flux_density_err: np.ndarray,
     lam_bounds: tuple[float, float],
     num_gaussians: int = 0,
+    vel_gaussian_fit_width: float = VEL_WIDTH_GAUSSIAN_FIT,
     lam_centre: float | None = None,
     n_mc_trials: int = NUM_MC_TRIALS,
     plot_gaussians: bool = True, #TODO: change back to False
@@ -18,36 +19,40 @@ def integrate_flux(
     title: str | None = None
 ) -> tuple[float, float]:
 
-    valid_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(lam)))
-    lam_trimmed = lam[valid_mask]
-    sfd_trimmed = spec_flux_density[valid_mask]
-    sfd_err_trimmed = spec_flux_density_err[valid_mask]
+    integrate_width_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(lam)))
 
     if num_gaussians > 0:
         if lam_centre is None:
             raise ValueError("lam_centre must be provided if num_gaussians > 0")
         gauss_sfd_vals, gauss_sfd_errs, _, _, _, _ = fit_gaussians(
-            lam_trimmed, sfd_trimmed, sfd_err_trimmed,
+            lam, spec_flux_density, spec_flux_density_err,
             num_gaussians=num_gaussians,
-            mask_vel_width=None,
+            mask_vel_width=vel_gaussian_fit_width,
             mask_lam_centre=lam_centre,
-            n_trials=n_mc_trials,
+            n_mc_trials=n_mc_trials,
             plot_fit=plot_gaussians,
             title=title
         )
-        y = gauss_sfd_vals
-        y_err = gauss_sfd_errs
+        gaussian_trimmed_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, lam_centre)
+        new_integrate_width_mask = np.where(
+            (lam[gaussian_trimmed_mask] > lam_bounds[0]) &
+            (lam[gaussian_trimmed_mask] < lam_bounds[1]) &
+            (np.isfinite(lam[gaussian_trimmed_mask]))
+        )
+        sfd_trimmed = gauss_sfd_vals[new_integrate_width_mask]
+        sfd_err_trimmed = gauss_sfd_errs[new_integrate_width_mask]
     else:
-        y = sfd_trimmed
-        y_err = sfd_err_trimmed
+        sfd_trimmed = spec_flux_density[integrate_width_mask]
+        sfd_err_trimmed = spec_flux_density_err[integrate_width_mask]
     
-    x = lam_trimmed
+    lam_trimmed = lam[integrate_width_mask]
 
-    flux = np.trapezoid(y, x=x)
-    err_weights = get_masked_diffs(x, mask=None)
-    flux_err = np.sqrt(np.sum((err_weights * y_err)**2))
+    flux = np.trapezoid(sfd_trimmed, x=lam_trimmed)
+    err_weights = get_masked_diffs(lam_trimmed, mask=None)
+    flux_err = np.sqrt(np.sum((err_weights * sfd_err_trimmed)**2))
 
     return flux, flux_err
+
 
 #TODO: check bounds are correct for integration
 #TODO: check result for no gaussians and for num_bins > 2
@@ -55,7 +60,8 @@ def calculate_balmer_decrement(
     lam: np.ndarray,
     sfd_diff: np.ndarray,
     sfd_diff_err: np.ndarray,
-    vel_calculation_width: float = VEL_TO_IGNORE_WIDTH,
+    vel_integration_width: float = VEL_TO_IGNORE_WIDTH,
+    vel_gaussian_fit_width: float = VEL_WIDTH_GAUSSIAN_FIT,
     vel_plot_width: float = VEL_PLOT_WIDTH,
     num_gaussians: int = DEFAULT_NUM_GAUSSIANS,
     n_mc_trials: int = NUM_MC_TRIALS,
@@ -63,24 +69,24 @@ def calculate_balmer_decrement(
     plot_curves: bool = True, #TODO: create a new plotting function for this
     year: int | str = "",
 ) -> tuple[float, float]:
-    bin_width = vel_calculation_width / num_bins
+    bin_width = vel_integration_width / num_bins
 
     if num_gaussians > 0:
         gauss_sfd_diff_alpha_vals, gauss_sfd_diff_alpha_errs, _, _, _, _ = fit_gaussians(
             lam, sfd_diff, sfd_diff_err,
             num_gaussians=num_gaussians,
-            mask_vel_width=vel_plot_width,
+            mask_vel_width=vel_gaussian_fit_width,
             mask_lam_centre=H_ALPHA,
-            n_trials=n_mc_trials,
+            n_mc_trials=n_mc_trials,
             plot_fit=plot_curves,
             title=f"{year} Hα flux difference from 2001"
         )
         gauss_sfd_diff_beta_vals, gauss_sfd_diff_beta_errs, _, _, _, _ = fit_gaussians(
             lam, sfd_diff, sfd_diff_err,
             num_gaussians=num_gaussians,
-            mask_vel_width=vel_plot_width,
+            mask_vel_width=vel_gaussian_fit_width,
             mask_lam_centre=H_BETA,
-            n_trials=n_mc_trials,
+            n_mc_trials=n_mc_trials,
             plot_fit=plot_curves,
             title=f"{year} Hβ flux difference from 2001"
         )
@@ -102,7 +108,7 @@ def calculate_balmer_decrement(
     vel_bin_centres = []
 
     for i in range(num_bins):
-        vel_left = -vel_calculation_width / 2 + i * bin_width
+        vel_left = -vel_integration_width / 2 + i * bin_width
         vel_centre = vel_left + bin_width / 2
         vel_right = vel_left + bin_width
 
@@ -125,92 +131,16 @@ def calculate_balmer_decrement(
 
     return np.array(balmer_decrements), np.array(balmer_decrements_err), np.array(vel_bin_centres)
 
-# def get_bd_comparison_info(
-#     lam: np.ndarray,
-#     sfd_diff: np.ndarray,
-#     sfd_diff_err: np.ndarray,
-#     num_bins_bounds: tuple[int, int],
-#     num_gaussians_bounds: tuple[int, int],
-#     vel_calculation_width: float,
-#     vel_plot_width: float,
-#     n_mc_trials: int
-# ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-
-#     if num_bins_bounds[0] == 1:
-#         num_bins_range = range(2, num_bins_bounds[1] + 1)
-#     else:
-#         num_bins_range = range(num_bins_bounds[0], num_bins_bounds[1] + 1)
-
-#     num_gaussians_range = range(num_gaussians_bounds[0], num_gaussians_bounds[1] + 1)
-
-#     print(f"num_bins_range: {num_bins_range}")
-#     print(f"num_gaussians_range: {num_gaussians_range}")
-
-#     balmer_decrements_1_bin = []
-#     balmer_decrements_1_bin_err = []
-#     balmer_decrements_many_bins = []
-#     balmer_decrements_many_bins_err = []
-#     vel_bin_centres_all = []
-
-#     for num_gaussians in num_gaussians_range:
-#         balmer_decrement_1_bin_arr, balmer_decrement_1_bin_err_arr, _ = calculate_balmer_decrement(
-#             lam, sfd_diff, sfd_diff_err,
-#             num_bins=1,
-#             num_gaussians=num_gaussians,
-#             n_mc_trials=n_mc_trials,
-#             vel_calculation_width=vel_calculation_width,
-#             vel_plot_width=vel_plot_width,
-#             plot_curves=False
-#         )
-#         balmer_decrements_1_bin.append(balmer_decrement_1_bin_arr[0])
-#         balmer_decrements_1_bin_err.append(balmer_decrement_1_bin_err_arr[0])
-        
-#         one_gauss_results = []
-#         for num_bins in num_bins_range:
-#             balmer_decrement_many_bins, balmer_decrement_many_bins_err, vel_bin_centres = calculate_balmer_decrement(
-#                 lam, sfd_diff, sfd_diff_err,
-#                 num_bins=num_bins,
-#                 num_gaussians=num_gaussians,
-#                 n_mc_trials=n_mc_trials,
-#                 vel_calculation_width=vel_calculation_width,
-#                 vel_plot_width=vel_plot_width
-#             )
-#             one_gauss_results.append({
-#                 'bd': balmer_decrement_many_bins,
-#                 'bd_err': balmer_decrement_many_bins_err,
-#                 'vel_centres': vel_bin_centres,
-#                 'num_bins': num_bins,
-#                 'num_gaussians': num_gaussians
-#             })
-#             #TODO: add dimension rather than just appending all into one flat list
-#             # one_gauss_many_bins_bd.append(balmer_decrement_many_bins)
-#             # one_gauss_many_bins_bd_err.append(balmer_decrement_many_bins_err)
-#             # one_gauss_many_bins_vel_centres.append(vel_bin_centres)
-#         balmer_decrements_many_bins.append(one_gauss_many_bins_bd)
-#         balmer_decrements_many_bins_err.append(one_gauss_many_bins_bd_err)
-#         vel_bin_centres_all.append(one_gauss_many_bins_vel_centres)
-        
-#     return (
-#         (balmer_decrements_1_bin, balmer_decrements_1_bin_err),
-#         (balmer_decrements_many_bins.T, balmer_decrements_many_bins_err.T),
-#         vel_bin_centres_all.T
-#     )
-
-#     return (
-#         np.array(balmer_decrements_1_bin),
-#         np.array(balmer_decrements_many_bins),
-#         np.array(vel_bin_centres_all)
-#     )
-
 def get_bd_comparison_info(
     lam: np.ndarray,
     sfd_diff: np.ndarray,
     sfd_diff_err: np.ndarray,
     num_bins_bounds: tuple[int, int],
     num_gaussians_bounds: tuple[int, int],
-    vel_calculation_width: float,
-    vel_plot_width: float,
-    n_mc_trials: int
+    vel_integration_width: float = VEL_TO_IGNORE_WIDTH,
+    vel_gaussian_fit_width: float = VEL_WIDTH_GAUSSIAN_FIT,
+    vel_plot_width: float = VEL_PLOT_WIDTH,
+    n_mc_trials: int = NUM_MC_TRIALS,
 ) -> tuple[list[list[dict[str, np.ndarray]]], list[int], list[int]]:
     ...
     
@@ -235,7 +165,8 @@ def get_bd_comparison_info(
                 num_bins=num_bins,
                 num_gaussians=num_gaussians,
                 n_mc_trials=n_mc_trials,
-                vel_calculation_width=vel_calculation_width,
+                vel_integration_width=vel_integration_width,
+                vel_gaussian_fit_width=vel_gaussian_fit_width,
                 vel_plot_width=vel_plot_width,
                 plot_curves=False
             )
