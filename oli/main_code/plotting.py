@@ -463,54 +463,41 @@ def compare_balmer_decrements(
     num_bins_list: list[int],
     year: int,
     colour_map: Colormap = COLOUR_MAP
-) -> None:
-    # Usage:
-    # Get results for num_gaussians=2, num_bins=5:
-    # ng_idx = num_gaussians_list.index(2)
-    # nb_idx = num_bins_list.index(5)
-    # data = results[ng_idx][nb_idx]
-    # print(data['bd'], data['vel_centres'])
-
+) -> float | None:
+    bd_mean = None
     for i, num_bins in enumerate(num_bins_list):
         if num_bins == 1:
             one_bin_results = [result[i] for result in results]
-            plt.plot( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
-                num_gaussians_list,
-                [result["bd"] for result in one_bin_results],
-                color='black',
-                marker='o',
-                lw = LINEWIDTH
+            one_bin_bds = [result["bd"] for result in one_bin_results]
+            plt.errorbar(
+                x=num_gaussians_list,
+                y=one_bin_bds,
+                yerr=[result["bd_err"] for result in one_bin_results],
+                # make data points not connected by lines
+                linestyle="None",
+                fmt='o', capsize=4
             )
-            plt.fill_between( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
-                num_gaussians_list,
-                [result["bd"] - result["bd_err"] for result in one_bin_results],
-                [result["bd"] + result["bd_err"] for result in one_bin_results],
-                color='black',
-                alpha=ERR_OPAC
+            bd_mean = np.mean(one_bin_bds)
+            plt.axhline(
+                bd_mean, linestyle="--", color="black",
+                lw=LINEWIDTH, label=f"Mean Balmer Decrement ({bd_mean:.2f})"
             )
             plt.xlabel("Number of Gaussians")
             plt.ylabel("Balmer Decrement")
             plt.ylim(0, 10)
             plt.title(f"{year} Balmer Decrement vs Number of Gaussians (no binning)")
+            plt.legend()
             plt.show()
             continue
         
         for j, num_gaussians in enumerate(num_gaussians_list):
-            plt.plot( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
-                results[j][i]["vel_centres"],
-                results[j][i]["bd"],
-                color=colour_map(j),
+            plt.errorbar(
+                x=results[j][i]["vel_centres"],
+                y=results[j][i]["bd"],
+                yerr=results[j][i]["bd_err"],
+                fmt='o', capsize=4,
                 label=f"{num_gaussians} gaussians",
-                linestyle="None",
-                marker='o',
-                lw = LINEWIDTH
-            )
-            plt.fill_between( #TODO: use plt.errorbar(x, y, yerr=y_error, fmt='-o', capsize=4) instead
-                results[j][i]["vel_centres"],
-                results[j][i]["bd"] - results[j][i]["bd_err"],
-                results[j][i]["bd"] + results[j][i]["bd_err"],
-                color=colour_map(j),
-                alpha=ERR_OPAC
+                color=colour_map(j)
             )
         plt.xlabel(VEL_LABEL)
         plt.ylabel("Balmer Decrement")
@@ -518,6 +505,7 @@ def compare_balmer_decrements(
         plt.title(f"{year} Balmer Decrement vs Velocity ({num_bins} bins)")
         plt.legend()
         plt.show()
+    return bd_mean
 
 
 

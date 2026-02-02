@@ -1,67 +1,29 @@
 import numpy as np
 from astropy.cosmology import Planck18 as cosmo 
+from astropy.cosmology import FlatLambdaCDM
 import astropy.units as u
 
 from .constants import *
 
 
-def fwhm_from_fit(x, y, sig, model, params, n_trials):
-    # n_trials = no. of monte carlo samples
-  fwhm_list = []
-  weights = 1.0 / sig
-  for _ in range(n_trials):
-    y_perturbed = y + np.random.normal(0, sig) # perturb the data with noise from uncertainty arr
+def get_luminosity(flux: float, flux_err: float, z: float = Z_SPEC) -> float:
+    dist = cosmo.luminosity_distance(z)
+    dist_cm = dist.to(u.cm)
 
-    result_mc = model.fit(y_perturbed, params.copy(), x=x, weights=weights) # refit model
+    flux_actual = flux * u.erg / (u.s * u.cm**2) * 1e-17
+    flux_err_actual = flux_err * u.erg / (u.s * u.cm**2) * 1e-17
 
-    #compute fwhm
-    y_fit_mc = result_mc.best_fit
-    half_max = np.max(y_fit_mc) / 2
-    above_half = np.where(y_fit_mc >= half_max)[0]
-    if len(above_half) > 1:
-      fwhm = x[above_half[-1]] - x[above_half[0]]
-      fwhm_list.append(fwhm)
+    luminosity = flux_actual * 4 * np.pi * (dist_cm**2)
+    lum_err = flux_err_actual * 4 * np.pi * (dist_cm**2)
 
-  # extract values
-  fwhm_mean = np.mean(fwhm_list) * u.AA
-  fwhm_std = np.std(fwhm_list) * u.AA
+    return luminosity.value, lum_err.value
 
-  # convert to km/s
-  rest_wavelength = 6562.8 * u.AA  # Hα rest wavelength
-  fwhm_vel = (fwhm_mean / rest_wavelength) * C_KM_S
-  fwhm_vel_err = (fwhm_std / rest_wavelength)* C_KM_S
-
-  return fwhm_vel, fwhm_vel_err
-
-def lum_from_fit(x, y, sig, model, params, n_trials):
-  trapflux_list = []
-  weights = 1.0 / sig
-  for _ in range(n_trials):
-      y_perturbed = y + np.random.normal(0, sig) # perturb the data with noise from uncertainty arr
-
-      result_mc = model.fit(y_perturbed, params.copy(), x=x, weights=weights) #refit model
-
-      y_fit_mc = result_mc.best_fit
-      trapflux = np.trapz(y_fit_mc, x)  #integrate with trapezoidal rule
-      trapflux_list.append(trapflux)
-
-  # extract values: mean and sd of the sampled integrals
-  trap_mean = np.mean(trapflux_list) * (10**(-17)) * u.erg / (u.s * u.cm**2)
-  trap_std = np.std(trapflux_list) * (10**(-17)) * u.erg / (u.s * u.cm**2)
-  
-  # Luminosity distance
-  z = 0.0582
-  d = cosmo.luminosity_distance(z)
-  d = d.to(u.cm)
-
-  # compute luminosity
-  luminosity = trap_mean * 4 * np.pi * (d**2)
-  lum_err = trap_std * 4 * np.pi * (d**2)
-
-  return luminosity, lum_err
-
-
-def get_bh_mass(l_ha, l_ha_err, fwhm_ha, fwhm_ha_err):
+def get_bh_mass(
+    lum_alpha: float,
+    lum_alpha_err: float,
+    fwhm_alpha: float,
+    fwhm_alpha_err: float
+) -> tuple[float, float]:
     """
     Estimate BH mass from Halpha line. Using the equation from Greene & Ho 2005
     
@@ -73,28 +35,34 @@ def get_bh_mass(l_ha, l_ha_err, fwhm_ha, fwhm_ha_err):
     mbh : Black hole mass in solar masses (with error mbh_err)
     Note: mbh_err calculated using log(mass) for easier calculation
     """
-    coeff = 2.0e6  
-    exp_l = 0.55
-    exp_fwhm = 2.06
+    coeff = 2.0e6   # a
+    exp_lum = 0.55  # b
+    exp_fwhm = 2.06 # c
 
     # Normalize inputs
-    l_norm = l_ha / 1e42
-    fwhm_norm = fwhm_ha / 1e3 
-    mbh = coeff * (l_norm**exp_l) * (fwhm_norm**exp_fwhm)
+    lum_norm = lum_alpha / 1e42     # L
+    fwhm_norm = fwhm_alpha / 1e3    # V
+
+    # M = a * L^b * V^c
+
+    mbh = coeff * (lum_norm**exp_lum) * (fwhm_norm**exp_fwhm)
 
     # uncertainty (using log(mass))
-    sig_loglum = (1/np.log(10)) * (l_ha_err / l_ha)
-    sig_logfwhm = (1/np.log(10)) * (fwhm_ha_err / fwhm_ha)
-    sig_loga = (1/np.log(10)) * (0.35 / 2)
-    sig_b = 0.02
-    sig_c = 0.06
-    b = 0.55
-    c = 2.06
+    sig_log_lum = lum_alpha_err / lum_alpha
+    sig_log_fwhm = fwhm_alpha_err / fwhm_alpha
+    sig_log_coeff = 0.35 / 2
+    sig_exp_lum = 0.02
+    sig_exp_fwhm = 0.06
 
-    
-    var_logm = (sig_loga)**2 + (np.log10(l_ha/(10**42)) * sig_b)**2 + (b*sig_loglum)**2 + (np.log10(fwhm_ha/(10**3)) * sig_c)**2 + (c*sig_logfwhm)**2
+    var_log_mbh = (
+        sig_log_coeff**2 +
+        (np.log(lum_norm) * sig_exp_lum)**2 +
+        (exp_lum * sig_log_lum)**2 +
+        (np.log(fwhm_norm) * sig_exp_fwhm)**2 +
+        (exp_fwhm*sig_log_fwhm)**2
+    )
 
-    sig_logm = np.sqrt(var_logm)
-    mbh_err = np.log(10) * mbh * sig_logm
+    sig_log_mbh = np.sqrt(var_log_mbh)
+    mbh_err = mbh * sig_log_mbh
 
     return mbh, mbh_err

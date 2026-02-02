@@ -321,6 +321,17 @@ def get_default_bounds(
     )
     return lower_bounds, upper_bounds
 
+def make_row(values, widths, alignments):
+    parts = []
+    for val, w, align in zip(values, widths, alignments):
+        if align == "center":
+            parts.append(f"{val:^{w}}")
+        elif align == "right":
+            parts.append(f"{val:>{w}}")
+        else:  # left
+            parts.append(f"{val:<{w}}")
+    return " | ".join(parts)
+
 def pretty_print_flux_comparison(
     flux_alpha_21: float,
     flux_alpha_21_err: float,
@@ -416,18 +427,6 @@ def pretty_print_flux_comparison(
         data_lens = [len(row[col_idx]) for row in rows]
         col_widths.append(max(header_len, *data_lens))
 
-    # Build format string
-    def make_row(values, widths, alignments):
-        parts = []
-        for val, w, align in zip(values, widths, alignments):
-            if align == "center":
-                parts.append(f"{val:^{w}}")
-            elif align == "right":
-                parts.append(f"{val:>{w}}")
-            else:  # left
-                parts.append(f"{val:<{w}}")
-        return " | ".join(parts)
-
     # Alignments for each column
     alignments = ["left", "left", "left", "center"]
 
@@ -440,3 +439,79 @@ def pretty_print_flux_comparison(
     for row in rows:
         print(make_row(row, col_widths, alignments))
     print("=" * table_width)
+
+def get_fwhm(x: np.ndarray, y_gaussian: np.ndarray, get_vel: bool = True) -> float:
+    half_max = np.max(y_gaussian) / 2
+    above_half = np.where(y_gaussian >= half_max)[0]
+    if len(above_half) < 2:
+        raise ValueError("No FWHM found - not enough points above half max")
+    lam_left = x[above_half[0]]
+    lam_right = x[above_half[-1]]
+    fwhm_ang = lam_right - lam_left
+    if get_vel is False:
+        return fwhm_ang
+    lam_centre_rest_frame = ((lam_right + lam_left) / 2) / (1 + Z_SPEC)
+    #TD: remove testing
+    # lcrf_option_1 = (x[np.argmax(y_gaussian)]) / (1 + Z_SPEC)
+    # lcrf_option_2 = ((lam_right + lam_left) / 2) / (1 + Z_SPEC)
+    # lcrf_option_3 = (x[(above_half[0] + above_half[-1]) // 2]) / (1 + Z_SPEC)
+    # print(f"Hα: {H_ALPHA}, Hβ: {H_BETA}")
+    # print(f"x[argmax(y)]: {lcrf_option_1}")
+    # print(f"average lam of lam_left and lam_right: {lcrf_option_2}")
+    # print(f"average index of lam_left and lam_right: {lcrf_option_3}")
+    #
+    vel_left = convert_lam_to_vel(lam_left, lam_centre_rest_frame)
+    vel_right = convert_lam_to_vel(lam_right, lam_centre_rest_frame)
+    fwhm_vel = vel_right - vel_left
+    return fwhm_vel
+
+def compare_yasmeen_results(
+    fwhm_alpha_15: tuple[float, float] | None = None,
+    fwhm_alpha_21: tuple[float, float] | None = None,
+    fwhm_beta_15: tuple[float, float] | None = None,
+    fwhm_beta_21: tuple[float, float] | None = None,
+    flux_alpha_15: tuple[float, float] | None = None,
+    flux_alpha_21: tuple[float, float] | None = None,
+    luminosity_alpha_15: tuple[float, float] | None = None,
+    luminosity_alpha_21: tuple[float, float] | None = None,
+    bd_15: tuple[float, float] | None = None,
+    bd_21: tuple[float, float] | None = None,
+    bh_mass_15: tuple[float, float] | None = None,
+    bh_mass_21: tuple[float, float] | None = None
+) -> None:
+    all_results = {
+        "FWHM Hα 2015 (km/s)": (fwhm_alpha_15, YASMEEN_RESULTS["fwhm_alpha_15"]),
+        "FWHM Hα 2021 (km/s)": (fwhm_alpha_21, YASMEEN_RESULTS["fwhm_alpha_21"]),
+        "FWHM Hβ 2015 (km/s)": (fwhm_beta_15, YASMEEN_RESULTS["fwhm_beta_15"]),
+        "FWHM Hβ 2021 (km/s)": (fwhm_beta_21, YASMEEN_RESULTS["fwhm_beta_21"]),
+        "Flux Hα 2015 (1e-17 ergs/s/cm^2)": (flux_alpha_15, YASMEEN_RESULTS["flux_alpha_15"]),
+        "Flux Hα 2021 (1e-17 ergs/s/cm^2)": (flux_alpha_21, YASMEEN_RESULTS["flux_alpha_21"]),
+        "Luminosity Hα 2015 (1e40 ergs/s)": (luminosity_alpha_15, YASMEEN_RESULTS["luminosity_alpha_15"]),
+        "Luminosity Hα 2021 (1e40 ergs/s)": (luminosity_alpha_21, YASMEEN_RESULTS["luminosity_alpha_21"]),
+        "Balmer decrement Hα 2015": (bd_15, YASMEEN_RESULTS["bd_15"]),
+        "Balmer decrement Hα 2021": (bd_21, YASMEEN_RESULTS["bd_21"]),
+        "BH mass 2015 (1e6 M_sun)": (bh_mass_15, YASMEEN_RESULTS["bh_mass_15"]),
+        "BH mass 2021 (1e6 M_sun)": (bh_mass_21, YASMEEN_RESULTS["bh_mass_21"])
+    }
+    
+    col1_width = 35
+    col2_width = 20
+    col3_width = 20
+    table_width = col1_width + col2_width + col3_width + 6
+
+    print("=" * table_width)
+    print("".ljust(col1_width), end=" | ")
+    print("Most recent results".ljust(col2_width), end=" | ")
+    print("SSP results".ljust(col3_width))
+    print("-" * table_width)
+    for name, (input_val, yasmeen_val) in all_results.items():
+        if input_val is None:
+            continue
+        if input_val[1] is None:
+            input_val_err = "?"
+        else:
+            input_val_err = f"{input_val[1]:.2f}"
+        print(f"{name}".ljust(col1_width), end=" | ")
+        print(f"{input_val[0]:.2f} ± {input_val_err}".ljust(col2_width), end=" | ")
+        print(f"{yasmeen_val[0]:.2f} ± {yasmeen_val[1]:.2f}".ljust(col3_width))
+    print("-" * table_width)

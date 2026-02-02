@@ -6,8 +6,11 @@ import warnings
 from matplotlib.colors import Colormap
 
 from .constants import *
-from .helpers import bin_data_by_median, get_masked_diffs, get_default_bounds, get_vel_lam_mask
-from .plotting import plot_diff_spectra, plot_gaussians
+from .helpers import (
+    get_fwhm, get_masked_diffs,
+    get_default_bounds, get_vel_lam_mask   
+)
+from .plotting import plot_gaussians
 
 def get_gaussian_func(n: int, return_sum: bool = True):
     """Factory that creates a curve_fit-compatible function for n Gaussians."""
@@ -93,9 +96,10 @@ def fit_gaussians(
     set_bounds_to_default: bool = True,
     mask_vel_width: float | None = VEL_WIDTH_GAUSSIAN_FIT,
     mask_lam_centre: float | None = None,
+    calculate_mean_fwhm: bool = False,
     use_best_fit_params_for_mc: bool = False, # faster and less accurate (smaller) errors if True
-    plot_fit: bool = True, #TODO: change back to False
-    # plot_fit: bool = False,
+    # plot_fit: bool = True, #TODO: change back to False
+    plot_fit: bool = False,
     plot_y_errs: bool = True,
     plot_summed_gaussian_errs: bool = False,
     colour_map: Colormap = COLOUR_MAP,
@@ -106,12 +110,15 @@ def fit_gaussians(
 ) -> tuple[
     np.ndarray, np.ndarray | None,
     np.ndarray[np.ndarray], float | None,
+    float | None, float | None,
     tuple[np.ndarray, np.ndarray, np.ndarray],
     tuple[np.ndarray, np.ndarray, np.ndarray]
 ]:
     if mask_vel_width is not None:
         if mask_lam_centre is None:
             raise ValueError("mask_lam_centre must be provided if mask_vel_width is provided")
+        if x_untrimmed.shape != y_untrimmed.shape:
+            raise ValueError("x_untrimmed and y_untrimmed must have the same shape")
         mask = get_vel_lam_mask(x_untrimmed, mask_vel_width, mask_lam_centre)
         x = x_untrimmed[mask]
         y = y_untrimmed[mask]
@@ -187,7 +194,7 @@ def fit_gaussians(
         else:
             mc_init_params = flat_param_guesses
 
-        summed_y_errs = get_mc_errs_perturb_y(
+        summed_y_errs, fwhm_mean, fwhm_err, _, _ = get_mc_errs_perturb_y(
             x=x,
             y=y,
             y_errs=y_errs,
@@ -197,7 +204,9 @@ def fit_gaussians(
             lower_bounds=lower_bounds,
             upper_bounds=upper_bounds,
             n_mc_trials=n_mc_trials,
-            best_fit_y=summed_y_vals
+            best_fit_y=summed_y_vals,
+            calculate_mean_fwhm=calculate_mean_fwhm,
+            print_warnings=plot_fit
         )
 
     if plot_fit:
@@ -219,7 +228,8 @@ def fit_gaussians(
         )
     
     return (
-        summed_y_vals, summed_y_errs, sep_y_vals, red_chi_sq,
+        summed_y_vals, summed_y_errs, sep_y_vals,
+        red_chi_sq, fwhm_mean, fwhm_err,
         (heights, mus, sigmas),
         (height_errs, mu_errs, sigma_errs)
     )
@@ -233,15 +243,18 @@ def get_mc_errs_perturb_y(
     max_func_ev: int,
     lower_bounds: list[float],
     upper_bounds: list[float],
-    best_fit_y: np.ndarray,
+    best_fit_y: np.ndarray, # used for bias calculation
     n_mc_trials: int = NUM_MC_TRIALS,
-) -> np.ndarray:
+    calculate_mean_fwhm: bool = False,
+    print_warnings: bool = False,
+) -> tuple[np.ndarray, float | None, float | None, np.ndarray, np.ndarray]:
     
     calculate_n_gaussians_func = get_gaussian_func(num_gaussians)
     
     fitted_y_samples = []
+    fwhm_samples = []
     
-    for _ in range(n_mc_trials):
+    for i in range(n_mc_trials):
         y_perturbed = y + np.random.normal(0, y_errs)
         
         try:
@@ -253,22 +266,29 @@ def get_mc_errs_perturb_y(
                 maxfev=max_func_ev,
                 bounds=(lower_bounds, upper_bounds)
             )
-            fitted_y_samples.append(calculate_n_gaussians_func(x, *best_fit_params))
+            ith_fitted_y = calculate_n_gaussians_func(x, *best_fit_params)
+            fitted_y_samples.append(ith_fitted_y)
         except RuntimeError:
             #TD: remove testing
-            print(f"Failed to fit Gaussian model on trial {_ + 1}")
+            print(f"Failed to fit Gaussian model on trial {i + 1}")
             #
-            pass  # Skip failed fits
+            continue  # Skip failed fits
+        
+        if calculate_mean_fwhm:
+            fwhm = get_fwhm(x, ith_fitted_y)
+            fwhm_samples.append(fwhm)
     
     fitted_y_samples = np.array(fitted_y_samples)
     y_fit_mean = np.mean(fitted_y_samples, axis=0)
     y_fit_errs = np.std(fitted_y_samples, axis=0)
+    fwhm_mean = np.mean(fwhm_samples) if calculate_mean_fwhm else None
+    fwhm_err = np.std(fwhm_samples) if calculate_mean_fwhm else None
 
     # Bias in units of MC standard deviation
     bias_sigma = np.abs(y_fit_mean - best_fit_y) / y_fit_errs
 
     # Flag if bias > 0.5σ anywhere
-    if np.any(bias_sigma > 0.5):
+    if print_warnings and np.any(bias_sigma > 0.5):
         mean_bias_sigma = np.mean(bias_sigma)
         warn_msg = (
             f"\nPotential bias: max deviation = {np.max(bias_sigma):.2f}σ\n" +
@@ -277,7 +297,7 @@ def get_mc_errs_perturb_y(
         warnings.warn(warn_msg)
 
     
-    return y_fit_errs
+    return y_fit_errs, fwhm_mean, fwhm_err, bias_sigma, y_fit_mean
 
 
 def get_mc_errs_perturb_params(

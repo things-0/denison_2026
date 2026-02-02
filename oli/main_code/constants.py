@@ -43,11 +43,25 @@ ATLAS_O_FLUX_22 = 0.0023
 ASASSN_G_FLUX_21 = -0.0172
 ASASSN_G_FLUX_22 = -0.0301
 
+YASMEEN_RESULTS = { # (value, error)
+    "fwhm_alpha_15": (2143, 60),            # km/s
+    "fwhm_alpha_21": (2097, 365),           # km/s
+    "fwhm_beta_15": (1731, 394),            # km/s
+    "fwhm_beta_21": (1759, 292),            # km/s
+    "flux_alpha_15": (635, 22),             # 10^-17 ergs/s/cm^2
+    "flux_alpha_21": (2330, 40),            # 10^-17 ergs/s/cm^2
+    "luminosity_alpha_15": (5.49, 0.19),    # 10^40 ergs/s
+    "luminosity_alpha_21": (20.1, 0.3),     # 10^40 ergs/s
+    "bd_15": (4.58, 1.69),                  # dimensionless
+    "bd_21": (7.68, 2.57),                  # dimensionless
+    "bh_mass_15": (1.95, 0.43),             # 1e6 M_sun
+    "bh_mass_21": (3.81, 1.58)              # 1e6 M_sun
+}
 
 SIGMA_TO_FWHM = 2 * np.sqrt(2 * np.log(2))
 EPS = 1e-8
 NUM_MC_TRIALS = 1000
-TEST_NUM_MC_TRIALS = 100
+TEST_NUM_MC_TRIALS = 50
 
 VEL_TO_IGNORE_WIDTH = 7000
 

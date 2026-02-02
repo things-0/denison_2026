@@ -237,19 +237,3 @@ def get_results(
             print()
 
     return results
-
-    # blue_lambdas = [lam01, lam15_blue, lam21, lam22]
-    # blue_fluxes = [flux01, flux15_blue, flux21, flux22]
-    # blue_variances = [var01, var15_blue, var21, var22]
-    # # blue_fluxes = [flux01, flux15_blue_shifted, flux21_shifted, flux22_shifted]
-    # # blue_variances = [var01, var15_blue_shifted, var21_shifted, var22_shifted]
-
-    # #TODO: make dict and plot instead of print
-    # idx_names = ["Hbeta", "Mg_b", "Fe4383"]
-
-    # for i, year in enumerate([2001, 2015, 2021, 2022]):
-    #     D4000_idx, D4000_idx_err = D4000_w_errs(blue_lambdas[i], blue_fluxes[i], blue_variances[i], z)
-    #     print(f"\nD4000 index for year {year}: {D4000_idx} with error {D4000_idx_err}")
-    #     for idx_name in idx_names:
-    #         idx, idx_err = idx_w_errs(idx_name, blue_lambdas[i], blue_fluxes[i], blue_variances[i], z)
-    #         print(f"{idx_name} index for year {year}: {idx} with error {idx_err}")
