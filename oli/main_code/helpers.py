@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import ast
 
 from .constants import *
 
@@ -516,10 +518,11 @@ def compare_yasmeen_results(
         print(f"{yasmeen_val[0]:.2f} ± {yasmeen_val[1]:.2f}".ljust(col3_width))
     print("-" * table_width)
 
-def get_new_filename(
+def get_new_qso_filename(
     filename: str,
     start: str = "qsopar",
-    end: str = ".fits"
+    end: str = ".fits",
+    folder_name: str = "data/qsofit/"
 ) -> str:
     if not (filename.startswith(start) and filename.endswith(end)):
         raise ValueError(f"Filename must start with '{start}' and end with '{end}'")
@@ -527,4 +530,85 @@ def get_new_filename(
     if not num_str.isdigit():
         raise ValueError("Filename must contain a number")
     new_num = int(num_str) + 1
+    while True:
+        if os.path.exists(f"{folder_name}{start}{new_num}{end}"):
+            new_num += 1
+        else:
+            break
+    # while os.path.exists(f"{folder_name}{start}{new_num}{end}"): # God knows why this doesn't work
+    #     new_num += 1
     return f"{start}{new_num}{end}"
+
+def get_output_file_name(
+    fname: str, # without extension
+    folder_name: str = "output/",
+) -> str:
+    if fname == FNAME_2001:
+        output_name = "SDSS_2001"
+    elif fname == FNAME_2021:
+        output_name = "SDSS_2021"
+    elif fname == FNAME_2022:
+        output_name = "SDSS_2022"
+    elif fname == FNAME_2015_BLUE_3_ARCSEC:
+        output_name = "SAMI_BLUE_3_ARCSEC"
+    elif fname == FNAME_2015_RED_3_ARCSEC:
+        output_name = "SAMI_RED_3_ARCSEC"
+    elif fname == FNAME_2015_BLUE_4_ARCSEC:
+        output_name = "SAMI_BLUE_4_ARCSEC"
+    elif fname == FNAME_2015_RED_4_ARCSEC:
+        output_name = "SAMI_RED_4_ARCSEC"
+    else:
+        raise NotImplementedError(f"Invalid filename: {fname}")
+    highest_num = 0
+    for name in os.listdir(folder_name):
+        if name.startswith(output_name):
+            if name.endswith(".fits") or name.endswith(".pdf"):
+                num = int(name.split("_v")[-1].split(".")[0])
+                if num > highest_num:   
+                    highest_num = num   
+    return f"{output_name}_v{highest_num + 1}"
+
+def log_kwargs(
+    kwargs: dict,
+    log_name: str = "log.csv"
+) -> None:
+    with open(log_name, "a") as f:
+        two_write = ""
+        for val in kwargs.values():
+            two_write += f"{val};"
+        f.write(two_write.strip(";") + "\n")
+
+def get_kwargs_from_log(
+    output_file_name: str,
+    log_name: str = "log.csv",
+    exclude_log_items: bool = True
+) -> dict:
+    with open(log_name, "r") as f:
+        keys = f.readline().strip().split(";")
+        if keys != COMBINED_KEYS:
+            print(keys)
+            print(COMBINED_KEYS)
+            raise ValueError("Keys in log file do not match COMBINED_KEYS")
+        output_file_name_index = COMBINED_KEYS.index("output_file_name") # should be 0
+        for line in f:
+            vals_str = line.strip().split(";")
+            vals = []
+            if output_file_name == vals_str[output_file_name_index]:
+                if exclude_log_items:
+                    new_keys = FIT_KEYS.copy()
+                else:
+                    new_keys = keys
+
+                for i, val_str in enumerate(vals_str):
+                    if (
+                        exclude_log_items and
+                        COMBINED_KEYS[i] in LOG_KEYS and
+                        i != output_file_name_index
+                    ):
+                        continue
+                    try:
+                        val = ast.literal_eval(val_str)
+                    except (ValueError, SyntaxError):
+                        val = val_str
+                    vals.append(val)
+                return dict(zip(new_keys, vals))

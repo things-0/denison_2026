@@ -64,9 +64,12 @@ YASMEEN_RESULTS = { # (value, error)
 
 SIGMA_TO_FWHM = 2 * np.sqrt(2 * np.log(2))
 EPS = 1e-8
+MAX_FLUX = 500
+MIN_FLUX = -1
 NUM_MC_TRIALS = 1000
 TEST_NUM_MC_TRIALS = 50
 
+TOTAL_LAM_BOUNDS = (3900, 9000)
 VEL_TO_IGNORE_WIDTH = 7000
 
 # Gaussian fitting parameters
@@ -140,3 +143,22 @@ tions of R = 1730 in the blue arm and R = 4500 in the red arm.
 
 # Average across all epochs and wavelength ranges
 # SDSS_res = 2000
+
+FIT_KEYS = [
+    "name", "nsmooth", "and_mask", "or_mask", "reject_badpix",
+    "deredden", "wave_range", "wave_mask", "decompose_host",
+    "host_prior", "host_prior_scale", "host_line_mask",
+    "decomp_na_mask", "qso_type", "npca_gal", "host_type",
+    "npca_qso", "Fe_uv_op", "poly", "BC", "rej_abs_conti",
+    "rej_abs_line", "initial_guess", "n_pix_min_conti",
+    "param_file_name", "MC", "MCMC", "nburn", "nsamp", "nthin",
+    "epsilon_jitter", "linefit", "save_result", "plot_fig",
+    "save_fig", "plot_corner", "save_fits_path", "save_fits_name",
+    "verbose", "kwargs_plot", "kwargs_conti_emcee", "kwargs_line_emcee"
+]
+LOG_KEYS = [
+    "output_file_name", "data_fname", "params_file_name",
+    "lam_bounds", "filter_bad_values", "interpolate_bad_values"
+]
+COMBINED_KEYS = LOG_KEYS + FIT_KEYS[1:]
+

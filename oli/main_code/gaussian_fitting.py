@@ -68,7 +68,7 @@ def get_initial_guesses(
         np.any(clipped_sigma_guesses != sigma_guesses)
     ):
         warn_msg = (
-            "\nInitial guesses were outside of bounds given.\n" +
+            "Initial guesses were outside of bounds given.\n" +
             "Values have been clipped to the bounds.\n" +
             f"Height bounds: ({min_height}, {max_height})\n" +
             f"Height guesses: {height_guesses}\n" +
@@ -291,7 +291,7 @@ def get_mc_errs_perturb_y(
     if print_warnings and np.any(bias_sigma > 0.5):
         mean_bias_sigma = np.mean(bias_sigma)
         warn_msg = (
-            f"\nPotential bias: max deviation = {np.max(bias_sigma):.2f}σ\n" +
+            f"Potential bias: max deviation = {np.max(bias_sigma):.2f}σ\n" +
             f"Mean bias: {mean_bias_sigma:.3f}σ"
         )
         warnings.warn(warn_msg)

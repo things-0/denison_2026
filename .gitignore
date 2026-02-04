@@ -4,8 +4,10 @@ oli/meeting_notes/
 oli/papers/
 oli/ssp_reports/
 oli/shaun_code/
-# oli/old_stuff/
+oli/old_stuff/
 oli/output/
+oli/output_messy/
+qsofit_example/
 Data/
 data/
 __pycache__/

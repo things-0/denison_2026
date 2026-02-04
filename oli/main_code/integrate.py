@@ -143,7 +143,7 @@ def calculate_balmer_decrement(
         h_beta_flux, h_beta_flux_err, _, _ = integrate_flux(x_beta, y_beta, y_beta_err, cur_lam_bounds_beta)
 
         if h_alpha_flux < 0 or h_beta_flux < 0:
-            warn_msg = "\nnegative flux values in this bin. returning NaN"
+            warn_msg = "negative flux values in this bin. returning NaN"
             warnings.warn(warn_msg)
             balmer_decrements.append(np.nan)
             balmer_decrements_err.append(np.nan)

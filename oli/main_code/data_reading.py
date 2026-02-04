@@ -2,11 +2,165 @@ import numpy as np
 import astropy.io.fits as fits
 from PyAstronomy import pyasl
 import spectres
+import warnings
 
 from .adjust_calibration import gaussian_blur_before_resampling, gaussian_blur_after_resampling, clip_sami_blue_edge
 from .constants import *
 from .helpers import get_min_res
 from .plotting import plot_min_res, plot_spectra, plot_vert_emission_lines
+
+def get_sami_lam_flux_err(
+    fname: str,
+    folder_name: str = SAMI_FOLDER_NAME,
+    filter_bad_values: bool = True,
+    interpolate_bad_values: bool = False,
+    lam_bounds: tuple[float, float] | None = TOTAL_LAM_BOUNDS,
+    flux_power_of_10: int = 17,
+    lam_in_vacuum: bool = True,
+    doareacorr: bool = False,
+    bugfix: bool = True
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+    with fits.open(folder_name + fname) as hdulist:
+        header = hdulist["PRIMARY"].header
+        crval1=header['CRVAL1']
+        cdelt1=header['CDELT1']
+        crpix1=header['CRPIX1']
+        naxis1=header['NAXIS1'] 
+        x=np.arange(naxis1)+1
+        L0=crval1-crpix1*cdelt1 #Lc-pix*dL        
+        lam = L0+x*cdelt1
+        
+        flux_uncorrected = hdulist["PRIMARY"].data
+        var = hdulist["VARIANCE"].data
+        err = np.array(np.sqrt(var), dtype=float)
+
+        #TD: remove
+        if doareacorr:
+            if bugfix:
+                areacorr=areacorr/2.0
+            areacorr = header['AREACORR']
+            flux = flux_uncorrected * areacorr *10 ** (flux_power_of_10 - 16)
+        else:
+            flux = flux_uncorrected * 10 ** (flux_power_of_10 - 16)
+        #
+        
+    # flux = flux_uncorrected * 10 ** (flux_power_of_10 - 16)
+
+    if lam_in_vacuum:
+        lam = pyasl.airtovac2(lam)
+
+    lam_mask = np.isfinite(lam)
+    if np.any(~lam_mask):
+        warn_msg = f"{np.sum(~lam_mask)} values of lam are not finite. These will be ignored."
+        warnings.warn(warn_msg)     #TODO: raise error instead
+        lam_valid = lam[lam_mask]
+        flux_valid = flux[lam_mask]
+        err_valid = err[lam_mask]
+    else:
+        lam_valid = lam
+        flux_valid = flux
+        err_valid = err
+
+    if not filter_bad_values:
+        # if np.any(~np.isfinite(var) | (var <= 0)):
+            # raise ValueError("ERROR: bad values in variance array. Cannot take the square root")
+        return flux, lam_valid, err
+
+    if lam_bounds is None:
+        not_in_lam_bounds = np.zeros_like(lam_valid, dtype=bool)
+    else:
+        not_in_lam_bounds = (lam_valid < lam_bounds[0]) | (lam_valid > lam_bounds[1])
+    bad_mask = (
+        # ~np.isfinite(lam) | #TODO: remove?
+        not_in_lam_bounds |
+        ~np.isfinite(flux_valid) | (flux_valid > MAX_FLUX) | (flux_valid < MIN_FLUX) |
+        ~np.isfinite(err_valid) | (err_valid <= 0) | (err_valid > MAX_FLUX)
+    )
+    good_mask = ~bad_mask
+
+    if interpolate_bad_values:
+        flux_interpolated = np.interp(lam_valid, lam_valid[good_mask], flux_valid[good_mask])
+        err_interpolated = np.interp(lam_valid, lam_valid[good_mask], err_valid[good_mask])
+        return lam_valid, flux_interpolated, err_interpolated
+    else:
+        lam_masked = lam_valid[good_mask]
+        flux_masked = flux_valid[good_mask]
+        err_masked = err_valid[good_mask]
+        return lam_masked, flux_masked, err_masked
+
+
+def get_sdss_lam_flux_err(
+    fname: str,
+    folder_name: str = SDSS_FOLDER_NAME,
+    filter_bad_values: bool = True,
+    interpolate_bad_values: bool = False,
+    lam_bounds: tuple[float, float] | None = TOTAL_LAM_BOUNDS,
+    flux_power_of_10: int = 17,
+    return_wresl: bool = False,
+) -> (
+    tuple[np.ndarray, np.ndarray, np.ndarray] |
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+):
+    with fits.open(folder_name + fname) as hdulist:
+        # read spectrum from COADD extension:
+        spec_table = hdulist['COADD'].data
+
+        flux = spec_table['flux']
+        flux *= 10 ** (flux_power_of_10 - 17)
+
+        loglam = spec_table['loglam']
+        # SDSS spectra are in log wavelength bins, to convert to linear:
+        lam = 10.0**loglam
+
+        # inverse variance
+        ivar = spec_table['ivar']
+        err = np.array(np.sqrt(1 / ivar), dtype=float)
+
+        # wavelength resolution
+        wresl = spec_table['wresl'] if return_wresl else None
+
+
+    lam_mask = np.isfinite(lam)
+    if np.any(~lam_mask):
+        warn_msg = f"{np.sum(~lam_mask)} values of lam are not finite. These will be ignored."
+        warnings.warn(warn_msg)     #TODO: raise error instead
+        lam_valid = lam[lam_mask]
+        flux_valid = flux[lam_mask]
+        err_valid = err[lam_mask]
+    else:
+        lam_valid = lam
+        flux_valid = flux
+        err_valid = err
+
+    # return flux, lam, 1 / np.sqrt(ivar)
+    if filter_bad_values: 
+        if lam_bounds is None:
+            not_in_lam_bounds = np.zeros_like(lam_valid, dtype=bool)
+        else:
+            not_in_lam_bounds = (lam_valid < lam_bounds[0]) | (lam_valid > lam_bounds[1])
+        bad_mask = (
+            not_in_lam_bounds |
+            ~np.isfinite(flux_valid) | (flux_valid > MAX_FLUX) | (flux_valid < MIN_FLUX) |
+            ~np.isfinite(err_valid) | (err_valid <= 0) | (err_valid > MAX_FLUX)
+        )
+        good_mask = ~bad_mask
+        if interpolate_bad_values:
+            # lam = np.interp(lam, lam[good_mask], lam[good_mask])
+            flux_interpolated = np.interp(lam_valid, lam_valid[good_mask], flux_valid[good_mask])
+            err_interpolated = np.interp(lam_valid, lam_valid[good_mask], err_valid[good_mask])
+            lfe = lam_valid, flux_interpolated, err_interpolated
+        else:
+            lam_masked = lam_valid[good_mask]
+            flux_masked = flux_valid[good_mask]
+            err_masked = err_valid[good_mask]
+            lfe = lam_masked, flux_masked, err_masked
+
+    if return_wresl:
+        return *lfe, wresl
+    else:
+        return lfe
+
 
 def sami_read_apspec(
     filename: str,
@@ -79,7 +233,7 @@ def sdss_read(
     hdulist.close()
 
     # define parts of spectrum where data is likely to be good:
-    idx = np.where((sdss_lam>3900) & (sdss_lam<9000))
+    idx = np.where((sdss_lam>TOTAL_LAM_BOUNDS[0]) & (sdss_lam<TOTAL_LAM_BOUNDS[1]))
     sdss_flux = sdss_flux[idx]
     sdss_lam = sdss_lam[idx]
     sdss_ivar = sdss_ivar[idx]

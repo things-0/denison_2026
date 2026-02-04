@@ -369,7 +369,7 @@ def plot_diff_spectra(
     )
     if ions is not None and not use_ang_x_axis and num_centres > 1:
         warn_msg = (
-            f"\nEmission lines only plotted with respect to {plot_labels[0]}."
+            f"Emission lines only plotted with respect to {plot_labels[0]}."
         )
         warnings.warn(warn_msg)
 
