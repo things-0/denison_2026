@@ -462,7 +462,8 @@ def compare_balmer_decrements(
     num_gaussians_list: list[int],
     num_bins_list: list[int],
     year: int,
-    colour_map: Colormap = COLOUR_MAP
+    colour_map: Colormap = COLOUR_MAP,
+    ylim: tuple[int, int] = (0, 10)
 ) -> float | None:
     bd_mean = None
     for i, num_bins in enumerate(num_bins_list):

@@ -48,15 +48,15 @@ def get_bh_mass(
     mbh = coeff * (lum_norm**exp_lum) * (fwhm_norm**exp_fwhm)
 
     # uncertainty (using log(mass))
-    sig_log_lum = lum_alpha_err / lum_alpha
-    sig_log_fwhm = fwhm_alpha_err / fwhm_alpha
-    sig_log_coeff = 0.35 / 2
+    sig_log_lum = lum_alpha_err / lum_alpha     # error of log(luminosity) = δL/L
+    sig_log_fwhm = fwhm_alpha_err / fwhm_alpha  # error of log(fwhm) = δV/V
+    sig_log_coeff = 0.35 / 2 # +0.4 -0.3
     sig_exp_lum = 0.02
     sig_exp_fwhm = 0.06
 
     var_log_mbh = (
         sig_log_coeff**2 +
-        (np.log(lum_norm) * sig_exp_lum)**2 +
+        (np.log(lum_norm) * sig_exp_lum)**2 +   # derivative * uncertainty...?
         (exp_lum * sig_log_lum)**2 +
         (np.log(fwhm_norm) * sig_exp_fwhm)**2 +
         (exp_fwhm*sig_log_fwhm)**2

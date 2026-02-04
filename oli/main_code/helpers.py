@@ -515,3 +515,16 @@ def compare_yasmeen_results(
         print(f"{input_val[0]:.2f} ± {input_val_err}".ljust(col2_width), end=" | ")
         print(f"{yasmeen_val[0]:.2f} ± {yasmeen_val[1]:.2f}".ljust(col3_width))
     print("-" * table_width)
+
+def get_new_filename(
+    filename: str,
+    start: str = "qsopar",
+    end: str = ".fits"
+) -> str:
+    if not (filename.startswith(start) and filename.endswith(end)):
+        raise ValueError(f"Filename must start with '{start}' and end with '{end}'")
+    num_str = filename[len(start) : -len(end)]
+    if not num_str.isdigit():
+        raise ValueError("Filename must contain a number")
+    new_num = int(num_str) + 1
+    return f"{start}{new_num}{end}"
