@@ -6,10 +6,15 @@ oli/ssp_reports/
 oli/shaun_code/
 oli/old_stuff/
 oli/output/
-oli/output_messy/
-qsofit_example/
+oli/AI_codxe/
+oli/pyqsofit_code/output/
+oli/pyqsofit_code/example/data/
+oli/pyqsofit_code/example/output/
+oli/qsofitmore_code/examples/
+dust_maps_data/
 Data/
 data/
 __pycache__/
 .DS_Store
 .vscode/
+.github/
