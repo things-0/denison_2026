@@ -69,7 +69,7 @@ MIN_FLUX = -1
 NUM_MC_TRIALS = 1000
 TEST_NUM_MC_TRIALS = 50
 
-TOTAL_LAM_BOUNDS = (3700, 9000)
+TOTAL_LAM_BOUNDS = (3900, 9000)
 VEL_TO_IGNORE_WIDTH = 7000
 
 # Gaussian fitting parameters
@@ -114,7 +114,7 @@ FLUX_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻²"
 FLUX_UNITS = r"$10^{-17}$ erg $\text{s}^{-1}$ $\text{cm}^{-2}$"
 SFD_UNITS = FLUX_UNITS + r" $\AA^{-1}$"
 # SFD_Y_AX_LABEL = f"Spectral flux density ({SFD_UNITS})"
-SFD_Y_AX_LABEL = r"F_{\lambda} " + f"({SFD_UNITS})"
+SFD_Y_AX_LABEL = r"$F_{\lambda}$ " + f"({SFD_UNITS})"
 
 # From 2021 "The SAMI Galaxy Survey: the third and final data release"
 """

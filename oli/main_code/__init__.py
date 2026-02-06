@@ -9,3 +9,4 @@ from .integrate import *
 from .plotting import *
 from .polynomial_fit import *
 from .gaussian_fitting import *
+from .qsofit import *

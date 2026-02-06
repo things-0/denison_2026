@@ -1,46 +1,18 @@
-#region imports and testing
-
-import glob, os, sys, timeit
-import matplotlib
-import numpy as np
-
-sys.path.append("/Users/o_thorp/Downloads/my_stuff/Uni/other/scholarships/denison_2026/oli")
-from main_code import data_reading
-from main_code.constants import *
-
-sys.path.append('../')
-from pyqsofit.PyQSOFit import QSOFit
 from astropy.io import fits
+import numpy as np
 from astropy.table import Table
-import matplotlib.pyplot as plt
-import warnings
+import os
 
-warnings.filterwarnings("ignore")
+os.chdir("/Users/o_thorp/Downloads/my_stuff/Uni/other/scholarships/denison_2026/oli")
 
-QSOFit.set_mpl_style()
+import sys
+sys.path.append("/Users/o_thorp/Downloads/my_stuff/Uni/other/scholarships/denison_2026/oli")
+from main_code import helpers
 
-# Show the versions so we know what works
-import astropy
-import lmfit
-import pyqsofit
+output_dir = "/Users/o_thorp/Downloads/my_stuff/Uni/other/scholarships/denison_2026/oli/pyqsofit_code/data"
+qsopar_fits_fname = helpers.get_new_qso_filename()
 
-# print(astropy.__version__)
-# print(lmfit.__version__)
-# print(pyqsofit.__version__)
 
-import emcee  # optional, for MCMC
-
-# print(emcee.__version__)
-# print(pyqsofit.__path__)
-#endregion
-
-os.chdir("/Users/o_thorp/Downloads/my_stuff/Uni/other/scholarships/denison_2026/oli/")
-example_dir = os.path.join(os.getcwd(), "pyqsofit_code", "example")
-# example_dir = os.path.join(pyqsofit.__path__[0], '..', 'example')
-example_data_dir = os.path.join(example_dir, "data")
-example_output_dir = os.path.join(example_dir, "output")
-
-#region create qsopar.fits
 # create a header
 hdr0 = fits.Header()
 hdr0['Author'] = 'Hengxiao Guo'
@@ -50,19 +22,19 @@ In this table, we specify the priors / initial conditions and boundaries for the
 """
 
 line_priors = np.rec.array([
-    (6564.61, 'Ha', 6400, 6800, 'Ha_br', 2, 0.0, 0.0, 1e-5, 5e-3, 0.004, 0.05, 0.015, 0, 0, 0, 0.05, 0),
-    # (6564.61, 'Ha', 6400, 6800, 'Ha_br', 2, 0.0, 0.0, 1e10, 5e-3, 0.004, 0.05, 0.015, 0, 0, 0, 0.05, 1),
-    (6564.61, 'Ha', 6400, 6800, 'Ha_na', 1, 0.0, 0.0, 1e10, 1e-3, 5e-4, 0.00169, 0.01, 1, 1, 0, 0.002, 1),
-    (6549.85, 'Ha', 6400, 6800, 'NII6549', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.00169, 5e-3, 1, 1, 1, 0.001, 1),
-    (6585.28, 'Ha', 6400, 6800, 'NII6585', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.00169, 5e-3, 1, 1, 1, 0.003, 1),
-    (6718.29, 'Ha', 6400, 6800, 'SII6718', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.00169, 5e-3, 1, 1, 2, 0.001, 1),
-    (6732.67, 'Ha', 6400, 6800, 'SII6732', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.00169, 5e-3, 1, 1, 2, 0.001, 1),
+    # (6564.61, 'Ha', 6400, 6800, 'Ha_br', 2, 0.0, 0.0, 1e-5, 5e-3, 0.004, 0.05, 0.015, 0, 0, 0, 0.05, 0),
+    (6564.61, 'Ha', 6400, 6800, 'Ha_br', 2, 0.0, 0.0, 1e10, 5e-3, 0.004, 0.005, 0.015, 0, 0, 0, 0.05, 1),
+    (6564.61, 'Ha', 6400, 6800, 'Ha_na', 1, 0.0, 0.0, 1e10, 1e-3, 5e-4, 0.0004, 0.01, 1, 1, 0, 0.002, 1),
+    (6549.85, 'Ha', 6400, 6800, 'NII6549', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.0004, 5e-3, 1, 1, 1, 0.001, 1),
+    (6585.28, 'Ha', 6400, 6800, 'NII6585', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.0004, 5e-3, 1, 1, 1, 0.003, 1),
+    (6718.29, 'Ha', 6400, 6800, 'SII6718', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.0004, 5e-3, 1, 1, 2, 0.001, 1),
+    (6732.67, 'Ha', 6400, 6800, 'SII6732', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.0004, 5e-3, 1, 1, 2, 0.001, 1),
 
-    (4862.68, 'Hb', 4640, 5100, 'Hb_br', 2, 0.0, 0.0, 1e-5, 5e-3, 0.004, 0.05, 0.01, 0, 0, 0, 0.01, 0),
-    # (4862.68, 'Hb', 4640, 5100, 'Hb_br', 2, 0.0, 0.0, 1e10, 5e-3, 0.004, 0.05, 0.01, 0, 0, 0, 0.01, 1),
-    (4862.68, 'Hb', 4640, 5100, 'Hb_na', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.00169, 0.01, 1, 1, 0, 0.002, 1),
-    (4960.30, 'Hb', 4640, 5100, 'OIII4959c', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.00169, 0.01, 1, 1, 0, 0.002, 1),
-    (5008.24, 'Hb', 4640, 5100, 'OIII5007c', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.00169, 0.01, 1, 1, 0, 0.004, 1),
+    # (4862.68, 'Hb', 4640, 5100, 'Hb_br', 2, 0.0, 0.0, 1e-5, 5e-3, 0.004, 0.05, 0.01, 0, 0, 0, 0.01, 0),
+    (4862.68, 'Hb', 4640, 5100, 'Hb_br', 2, 0.0, 0.0, 1e10, 5e-3, 0.004, 0.005, 0.01, 0, 0, 0, 0.01, 1),
+    (4862.68, 'Hb', 4640, 5100, 'Hb_na', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.0004, 0.01, 1, 1, 0, 0.002, 1),
+    (4960.30, 'Hb', 4640, 5100, 'OIII4959c', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.0004, 0.01, 1, 1, 0, 0.002, 1),
+    (5008.24, 'Hb', 4640, 5100, 'OIII5007c', 1, 0.0, 0.0, 1e10, 1e-3, 2.3e-4, 0.0004, 0.01, 1, 1, 0, 0.004, 1),
     (4960.30, 'Hb', 4640, 5100, 'OIII4959w',   1, 0.0, 0.0, 1e-2, 3e-3, 2.3e-4, 0.004,  0.01,  2, 2, 0, 0.001, 1),
     # (4960.30, 'Hb', 4640, 5100, 'OIII4959w',   1, 0.0, 0.0, 1e10, 3e-3, 2.3e-4, 0.004,  0.01,  2, 2, 0, 0.001, 1),
     (5008.24, 'Hb', 4640, 5100, 'OIII5007w',   1, 0.0, 0.0, 1e-2, 3e-3, 2.3e-4, 0.004,  0.01,  2, 2, 0, 0.002, 1),
@@ -238,52 +210,7 @@ hdu4 = fits.BinTableHDU(data=measure_info, header=hdr4, name='measure_info')
 # hdu1 = fits.BinTableHDU(data=hdu1.data[mask_na], header=hdr1, name='data')
 hdu1 = fits.BinTableHDU(data=hdu1.data, header=hdr1, name='data')
 hdu_list = fits.HDUList([primary_hdu, hdu1, hdu2, hdu3, hdu4])
-hdu_list.writeto(os.path.join(example_data_dir, 'qsopar.fits'), overwrite=True)
+hdu_list.writeto(os.path.join(output_dir, qsopar_fits_fname), overwrite=True)
 #endregion
 
-#region get data
-save_fig = True
-save_fit = False
-
-output_fig_name = "my_qso_fig"
-output_fit_name = "my_qso_fit"
-
-lam, flux, err, other_data = data_reading.get_sdss_lam_flux_err(FNAME_2001, get_other_data=True)
-z = Z_SPEC
-ra = RA
-dec = DEC
-plateid = other_data['plateid']
-mjd = other_data['mjd']
-fiberid = other_data['fiberid']
-
-# output_fig_name = "example_qso_fig"
-# output_fit_name = "example_qso_fit"
-
-# data = fits.open(os.path.join(example_data_dir, 'spec-0266-51602-0107.fits'))
-# lam = 10 ** data[1].data['loglam']  # OBS wavelength [A]
-# flux = data[1].data['flux']  # OBS flux [erg/s/cm^2/A]
-# err = 1 / np.sqrt(data[1].data['ivar'])  # 1 sigma error
-# z = data[2].data['z'][0]  # Redshift
-
-
-# # Optional
-# ra = data[0].header['plug_ra']  # RA
-# dec = data[0].header['plug_dec']  # DEC
-# plateid = data[0].header['plateid']  # SDSS plate ID
-# mjd = data[0].header['mjd']  # SDSS MJD
-# fiberid = data[0].header['fiberid']  # SDSS fiber ID
-#endregion
-
-
-q = QSOFit(lam, flux, err, z, ra=ra, dec=dec, plateid=plateid, mjd=mjd, fiberid=fiberid, path=example_data_dir)
-
-q.Fit(name=output_fig_name, nsmooth=1, deredden=True, reject_badpix=False, wave_range=None, host_type="PCA", \
-      wave_mask=None, decompose_host=True, host_prior=True, decomp_na_mask=True, npca_gal=5, npca_qso=10, qso_type='CZBIN1',\
-      Fe_uv_op=False, poly=False, BC=False, rej_abs_conti=False, rej_abs_line=False, MCMC=False, verbose=False, \
-      save_result=save_fit, plot_fig=True, save_fig=save_fig, save_fits_path=example_output_dir, save_fits_name=output_fit_name,
-      kwargs_plot={'save_fig_path': example_output_dir})
-
-if save_fig:
-    print(f"Saved figure to {example_output_dir}/{output_fig_name}.pdf")
-if save_fit:
-    print(f"Saved fit to {example_output_dir}/{output_fit_name}.fits")
+print(f"Saved {qsopar_fits_fname} to {output_dir}")

@@ -46,11 +46,9 @@ def plot_vert_emission_lines(
 
 
 def plot_min_res(
-    lam01: np.ndarray,
+    lam_sdss: np.ndarray,
     lam15_blue: np.ndarray,
     lam15_red: np.ndarray,
-    lam21: np.ndarray,
-    lam22: np.ndarray,
     res_min: np.ndarray,
     res_01: np.ndarray,
     res_21: np.ndarray,
@@ -80,10 +78,10 @@ def plot_min_res(
     plt.axhline(RES_15_BLUE, color='blue', linestyle='--', label="SAMI blue")
     if plot_RES_15_RED:
         plt.axhline(RES_15_RED, color='red', linestyle='--', label="SAMI red")
-    plt.plot(lam21, res_21, alpha=0.5, label="2021")
-    plt.plot(lam22, res_22, alpha=0.5, label="2022")
-    plt.plot(lam01, res_01, alpha=0.5, label="SDSS Average")
-    plt.plot(lam01, res_min, color='black', alpha=0.5, lw=4, linestyle='--', label="Minimum")
+    plt.plot(lam_sdss, res_21, alpha=0.5, label="2021")
+    plt.plot(lam_sdss, res_22, alpha=0.5, label="2022")
+    plt.plot(lam_sdss, res_01, alpha=0.5, label="SDSS Average")
+    plt.plot(lam_sdss, res_min, color='black', alpha=0.5, lw=4, linestyle='--', label="Minimum")
     plt.fill_betweenx(res_plot_bounds, lam15_blue_min, lam15_blue_max, color='lightblue', alpha=0.5, label="SAMI blue coverage")
     plt.fill_betweenx(res_plot_bounds, lam15_red_min, lam15_red_max, color='red', alpha=0.2, label="SAMI red coverage")
     plt.xlabel(ANG_LABEL)
@@ -264,6 +262,7 @@ def plot_diff_spectra(
     plot_labels: list[str] | None = [r"H-${\alpha}$", r"H-${\beta}$"],
     use_ang_x_axis: bool = False,
     plot_y_bounds: tuple[float, float] | bool = True,
+    scale_axes: bool = False,
     error_opacity: float = ERR_OPAC,
     colour_map: Colormap = COLOUR_MAP,
 ) -> None:
@@ -302,7 +301,15 @@ def plot_diff_spectra(
         )
 
 
-    plt.figure(figsize=FIG_SIZE)
+    if scale_axes: #TODO: finish setting up plot parameters
+        raise NotImplementedError("scale_axes is not implemented")
+        if num_centres == 2:
+            fig, ax = plt.subplots(figsize=FIG_SIZE)
+        else:
+            raise ValueError("scale_axes is only supported for 2 centres")
+    else:
+        plt.figure(figsize=FIG_SIZE)
+        plt.ylabel(SFD_Y_AX_LABEL)
     for i in range(num_centres):
         if diffs_15 is not None:
             label_info = plot_labels[i]
@@ -385,13 +392,26 @@ def plot_diff_spectra(
                 plt.ylim(-10, 30)
             elif plot_centres == H_BETA:
                 plt.ylim(-10, 20)
+        elif num_centres == 2:
+            #TODO: align maxes
+            raise NotImplementedError("align_maxes is not implemented")
+            # y_bounds = get_scaled_y_bounds(
+            #     y1=diff_15,
+            #     y2=diff_21,
+            #     ax1_y_bounds=(-10, 30),
+            #     ax2_y_bounds=(None, 30),
+            #     y_val_line_up=0,
+            #     y_top_scale_factor=1.2
+            # )
         else:
             plt.ylim(-10, 30)
 
+    plt.axhline(0, color='black', linestyle='--', alpha=0.5, lw=LINEWIDTH)
     plt.xlabel(x_axis_label)
     plt.ylabel(SFD_Y_AX_LABEL)
     plt.title(f"Spectral flux density difference from 2001")
-    plt.legend()
+    if not scale_axes:
+        plt.legend()
     plt.show()
 
 def plot_gaussians(

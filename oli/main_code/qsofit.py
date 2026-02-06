@@ -4,16 +4,19 @@ import os
 import warnings
 from astropy.io import fits
 
-from ..main_code.constants import *
-from ..main_code.helpers import get_new_qso_filename
+import sys
+sys.path.append("/Users/o_thorp/Downloads/my_stuff/Uni/other/scholarships/denison_2026/oli")
+
+from main_code.constants import *
+from main_code.helpers import get_new_qso_filename
 
 def edit_qsopar(
+    file_name: str,
     value_name_to_edit: str,
     new_value: Any,
     col_name_and_val: tuple[str, Any] | None, # ("linename", "Ha_na"), ("maxsig", 0.001690)
     mask: np.ndarray | None = None,
-    file_name: str = "qsopar2.fits",
-    folder_name: str = "data/qsofit/",
+    folder_name: str = "pyqsofit_code/data/",
     ext_num: int = 1,
     make_copy: bool = True,
     print_change: bool = True
@@ -68,7 +71,7 @@ def edit_qsopar(
 def fits_is_equal(
     file_name_1: str,
     file_name_2: str = "qsopar0.fits",
-    folder: str = "data/qsofit/",
+    folder: str = "pyqsofit_code/data/",
     ext_num: int = 1,
 ) -> bool:
     with fits.open(folder + file_name_1, mode='readonly') as hdul1, fits.open(folder + file_name_2, mode='readonly') as hdul2:

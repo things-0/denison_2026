@@ -97,14 +97,15 @@ def get_sdss_lam_flux_err(
     interpolate_bad_values: bool = False,
     lam_bounds: tuple[float, float] | None = TOTAL_LAM_BOUNDS,
     flux_power_of_10: int = 17,
-    return_wresl: bool = False,
+    get_other_data: bool = False
 ) -> (
     tuple[np.ndarray, np.ndarray, np.ndarray] |
     tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 ):
     with fits.open(folder_name + fname) as hdulist:
         # read spectrum from COADD extension:
-        spec_table = hdulist['COADD'].data
+        # spec_table = hdulist["COADD"].data
+        spec_table = hdulist[1].data
 
         flux = spec_table['flux']
         flux *= 10 ** (flux_power_of_10 - 17)
@@ -117,8 +118,33 @@ def get_sdss_lam_flux_err(
         ivar = spec_table['ivar']
         err = np.array(np.sqrt(1 / ivar), dtype=float)
 
-        # wavelength resolution
-        wresl = spec_table['wresl'] if return_wresl else None
+        if get_other_data:
+            header_info = hdulist[0].header
+
+            try:
+                # wavelength resolution
+                wresl = spec_table['wresl']
+            except KeyError:
+                warn_msg = f"Wavelength resolution data not available in {fname}"
+                warnings.warn(warn_msg)
+                wresl = None
+            
+            plug_ra = header_info['plug_ra']
+            plug_dec = header_info['plug_dec']
+            plateid = header_info['plateid']
+            mjd = header_info['mjd']
+            fiberid = header_info['fiberid']
+            z = hdulist[2].data['z'][0]
+
+            other_data = {
+                "wresl": wresl,
+                "plug_ra": plug_ra,
+                "plug_dec": plug_dec,
+                "plateid": plateid,
+                "mjd": mjd,
+                "fiberid": fiberid,
+                "z": z
+            }
 
 
     lam_mask = np.isfinite(lam)
@@ -156,8 +182,8 @@ def get_sdss_lam_flux_err(
             err_masked = err_valid[good_mask]
             lfe = lam_masked, flux_masked, err_masked
 
-    if return_wresl:
-        return *lfe, wresl
+    if get_other_data:
+        return *lfe, other_data
     else:
         return lfe
 
@@ -298,6 +324,9 @@ def get_adjusted_data(
     flux21, lam21, ivar21, fwhm21 = sdss_read(sdss_folder_name + fname_2021) # 2021 file
     flux22, lam22, ivar22, fwhm22 = sdss_read(sdss_folder_name + fname_2022) # 2022 file
     
+    if len(lam21) != len(lam22) or len(lam01) != len(lam21):
+        raise ValueError("ERROR: mismatch in number of wavelength points. Try adjusting TOTAL_LAM_BOUNDS.")
+
     flux15_blue, lam15_blue, var15_blue = sami_read_apspec(
         sami_folder_name + fname_2015_blue,
         "PRIMARY", "VARIANCE"
@@ -325,15 +354,13 @@ def get_adjusted_data(
     )
     if plot_res_coverage:
         plot_min_res(
-            lam01,
-            lam15_blue,
-            lam15_red,
-            lam21,
-            lam22,
-            res_min,
-            res_01,
-            res_21,
-            res_22,
+            lam_sdss=lam21,
+            lam15_blue=lam15_blue,
+            lam15_red=lam15_red,
+            res_min=res_min,
+            res_01=res_01,
+            res_21=res_21,
+            res_22=res_22,
             plot_RES_15_RED=False
         )
 

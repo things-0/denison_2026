@@ -519,10 +519,10 @@ def compare_yasmeen_results(
     print("-" * table_width)
 
 def get_new_qso_filename(
-    filename: str,
+    filename: str = "qsopar0.fits",
     start: str = "qsopar",
     end: str = ".fits",
-    folder_name: str = "data/qsofit/"
+    folder_name: str = "pyqsofit_code/data/"
 ) -> str:
     if not (filename.startswith(start) and filename.endswith(end)):
         raise ValueError(f"Filename must start with '{start}' and end with '{end}'")
@@ -541,7 +541,7 @@ def get_new_qso_filename(
 
 def get_output_file_name(
     fname: str, # without extension
-    folder_name: str = "output/",
+    folder_name: str = "pyqsofit_code/output/",
 ) -> str:
     if fname == FNAME_2001:
         output_name = "SDSS_2001"
@@ -570,7 +570,7 @@ def get_output_file_name(
 
 def log_kwargs(
     kwargs: dict,
-    log_name: str = "log.csv"
+    log_name: str = "pyqsofit_code/log.csv"
 ) -> None:
     with open(log_name, "a") as f:
         two_write = ""
@@ -580,7 +580,7 @@ def log_kwargs(
 
 def get_kwargs_from_log(
     output_file_name: str,
-    log_name: str = "log.csv",
+    log_name: str = "pyqsofit_code/log.csv",
     exclude_log_items: bool = True
 ) -> dict:
     with open(log_name, "r") as f:
@@ -612,3 +612,94 @@ def get_kwargs_from_log(
                         val = val_str
                     vals.append(val)
                 return dict(zip(new_keys, vals))
+
+# def get_scaled_y_bounds(
+#     ax1_y_bounds: tuple[float, float],
+#     ax2_y_bounds: tuple[float | None, float | None],
+#     y1_ref: float,
+#     y2_ref: float,
+# ) -> tuple[float, float]:
+#     y1_min, y1_max = ax1_y_bounds
+#     y2_min, y2_max = ax2_y_bounds
+
+#     y1_range = y1_max - y1_min
+#     if y1_range == 0:
+#         raise ValueError("ax1_y_bounds has zero range")
+
+#     f = (y1_ref - y1_min) / y1_range
+
+#     if y2_min is None and y2_max is None:
+#         raise ValueError("Only one of ax2_y_bounds can be None")
+
+#     if y2_min is None:
+#         # solve for y2_min
+#         # (y2_ref - y2_min) / (y2_max - y2_min) = f
+#         # y2_ref - y2_min = f*(y2_max - y2_min)
+#         # y2_ref - y2_min = f*y2_max - f*y2_min
+#         # y2_ref - f*y2_max = y2_min*(1 - f)
+#         if f == 1:
+#             raise ValueError("f=1 implies y2_min is undefined")
+#         y2_min = (y2_ref - f * y2_max) / (1 - f)
+#         return y2_min, y2_max
+
+#     if y2_max is None:
+#         # solve for y2_max
+#         # (y2_ref - y2_min) / (y2_max - y2_min) = f
+#         # y2_ref - y2_min = f*y2_max - f*y2_min
+#         # y2_ref + y2_min*(f - 1) = f*y2_max
+#         if f == 0:
+#             raise ValueError("f=0 implies y2_max is undefined")
+#         y2_max = (y2_ref + y2_min * (f - 1)) / f
+#         return y2_min, y2_max
+
+#     raise ValueError("One of ax2_y_bounds must be None")
+
+
+def get_scaled_y_bounds(
+    y1: np.ndarray | None = None,
+    y2: np.ndarray | None = None,
+    ax1_y_bounds: tuple[float, float] | None = None,
+    ax2_y_bounds: tuple[float | None, float | None] | None = None,
+    align_maxes: bool = True,
+    fix_y2_top: bool = True,
+    y_val_line_up: float = 0.0,
+    y_top_scale_factor: float = 1.2
+) -> tuple[float, float]:
+    if ax1_y_bounds is None:
+        if y1 is None:
+            raise ValueError("y1 must be provided if ax1_y_bounds is None")
+        y1_top = np.max(y1)*y_top_scale_factor
+        y1_bottom = np.min(y1) - (y1_top - np.max(y1))
+        ax1_y_bounds = (y1_bottom, y1_top)
+    if ax2_y_bounds is None:
+        if y2 is None:
+            raise ValueError("y2 must be provided if ax2_y_bounds is None")
+        if align_maxes:
+            #TODO: implement
+            raise NotImplementedError("align_maxes is not implemented")
+        else:
+            y2_top = np.max(y2)*y_top_scale_factor
+        if fix_y2_top:
+            y2_bottom = None
+        else:
+            y2_bottom = np.min(y2) - (y2_top - np.max(y2))
+            y2_top = None
+        ax2_y_bounds = (y2_bottom, y2_top)
+
+    ax1_y_range = ax1_y_bounds[1] - ax1_y_bounds[0]
+    y_val_frac = (y_val_line_up - ax1_y_bounds[0]) / ax1_y_range
+    if ax2_y_bounds[0] is None:
+        if ax2_y_bounds[1] is None:
+            raise ValueError("Only one of ax2_y_bounds can be None")
+        ax2_low = (y_val_line_up - y_val_frac * ax2_y_bounds[1]) / (1 - y_val_frac)
+        ax2_y_range = ax2_y_bounds[1] - ax2_low
+        print(f"ax1 range: {ax1_y_range}")
+        print(f"y_val_frac: {y_val_frac}")
+        print(f"ax2_low: {ax2_low}")
+        print(f"ax2 y val line up: {ax2_low + y_val_frac * ax2_y_range}")
+        return ax2_low, ax2_y_bounds[1]
+    elif ax2_y_bounds[1] is None:
+        ax2_high = (y_val_line_up + ax2_y_bounds[0] * (y_val_frac - 1)) / y_val_frac
+        return ax2_y_bounds[0], ax2_high
+    else:
+        raise ValueError("One of ax2_y_bounds must be None")
