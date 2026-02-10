@@ -107,7 +107,7 @@ def plot_min_res(
     plt.plot(lam_sdss, res_min, color='black', alpha=0.5, lw=4, linestyle='--', label="Minimum")
     plt.fill_betweenx(res_plot_bounds, lam15_blue_min, lam15_blue_max, color='lightblue', alpha=0.5, label="SAMI blue coverage")
     plt.fill_betweenx(res_plot_bounds, lam15_red_min, lam15_red_max, color='red', alpha=0.2, label="SAMI red coverage")
-    plt.xlabel(const.ANG_LABEL)
+    plt.xlabel(const.REST_ANG_LABEL)
     plt.ylabel("Resolving Power")
     if const.PLOT_TITLES:
         plt.title("Resolution of SDSS spectra")
@@ -292,7 +292,7 @@ def plot_diff_spectra(
     fill_between_label: str | None = None,
     fill_between_opacity: float = const.FILL_BETWEEN_OPAC,
     plot_centres: float | list[float] = [const.H_ALPHA, const.H_BETA],
-    plot_labels: list[str] | None = [r"H-${\alpha}$", r"H-${\beta}$"],
+    plot_labels: list[str] | None = [r"H${\alpha}$", r"H${\beta}$"],
     use_ang_x_axis: bool = False,
     plot_y_bounds: tuple[float, float] | bool = True,
     scale_axes: bool = False,
@@ -325,6 +325,8 @@ def plot_diff_spectra(
         diffs_21_err = [diff_21_err] if diff_21_err is not None else None
         diffs_22_err = [diff_22_err] if diff_22_err is not None else None
     else:
+        if vel_plot_width is None:
+            raise ValueError("use_ang_x_axis must be True if vel_plot_width is None")
         x_axis_label = const.VEL_LABEL
         x_15, diffs_15, diffs_15_err = convert_to_vel_data(
             lam, diff_15, diff_15_err, plot_centres, vel_plot_width
@@ -405,8 +407,8 @@ def plot_diff_spectra(
 
     if isinstance(ions, bool):
         if ions:
-            ions_near_h_alpha = {r"H-${\alpha}$": const.H_ALPHA, "S[II] (1)": const.SII_1, "S[II] (2)": const.SII_2, "N[II] (2)": const.NII_2}
-            ions_near_h_beta = {r"H-${\beta}$": const.H_BETA, "O[III] (1)": const.OIII_1, "O[III] (2)": const.OIII_2}
+            ions_near_h_alpha = {r"H${\alpha}$": const.H_ALPHA, "S[II] (blue)": const.SII_BLUE, "S[II] (red)": const.SII_RED, "N[II] (strong)": const.NII_STRONG}
+            ions_near_h_beta = {r"H${\beta}$": const.H_BETA, "O[III] (weak)": const.OIII_WEAK, "O[III] (strong)": const.OIII_STRONG}
             if isinstance(plot_centres, list):
                 ions = {}
                 if const.H_ALPHA in plot_centres:
@@ -454,7 +456,7 @@ def plot_diff_spectra(
             if plot_centres == const.H_ALPHA:
                 plt.ylim(-10, 30)
             elif plot_centres == const.H_BETA:
-                plt.ylim(-10, 20)
+                plt.ylim(-7, 12)
         elif not scale_axes:
             plt.ylim(-10, 30)
 
@@ -530,7 +532,7 @@ def plot_gaussians(
     plt.ylabel(y_axis_label)
     if title is not None and const.PLOT_TITLES:
         plt.title(title)
-    plt.legend()
+    plt.legend(loc="upper right")
     my_savefig(save_fig_name)
     plt.show()
 

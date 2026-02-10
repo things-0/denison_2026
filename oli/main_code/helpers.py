@@ -355,6 +355,10 @@ def pretty_print_flux_comparison(
     flux_alpha_atlas_o_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, const.ATLAS_O_BAND_WIDTH, const.ATLAS_O_BAND_LAM)
     flux_alpha_ztf_r_21_mjy = convert_flux_to_mJy(flux_alpha_21, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
     flux_alpha_ztf_r_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
+    flux_alpha_ztf_g_21_mjy = convert_flux_to_mJy(flux_alpha_21, const.ZTF_G_BAND_WIDTH, const.ZTF_G_BAND_LAM)
+    flux_alpha_ztf_g_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, const.ZTF_G_BAND_WIDTH, const.ZTF_G_BAND_LAM)
+    flux_alpha_ztf_i_21_mjy = convert_flux_to_mJy(flux_alpha_21, const.ZTF_I_BAND_WIDTH, const.ZTF_I_BAND_LAM)
+    flux_alpha_ztf_i_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, const.ZTF_I_BAND_WIDTH, const.ZTF_I_BAND_LAM)
 
     flux_alpha_asassn_g_22_mjy = convert_flux_to_mJy(flux_beta_22, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
     flux_alpha_asassn_g_22_mjy_err = convert_flux_to_mJy(flux_beta_22_err, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
@@ -362,14 +366,22 @@ def pretty_print_flux_comparison(
     flux_alpha_atlas_o_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, const.ATLAS_O_BAND_WIDTH, const.ATLAS_O_BAND_LAM)
     flux_alpha_ztf_r_22_mjy = convert_flux_to_mJy(flux_alpha_22, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
     flux_alpha_ztf_r_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
+    flux_alpha_ztf_g_22_mjy = convert_flux_to_mJy(flux_alpha_22, const.ZTF_G_BAND_WIDTH, const.ZTF_G_BAND_LAM)
+    flux_alpha_ztf_g_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, const.ZTF_G_BAND_WIDTH, const.ZTF_G_BAND_LAM)
+    flux_alpha_ztf_i_22_mjy = convert_flux_to_mJy(flux_alpha_22, const.ZTF_I_BAND_WIDTH, const.ZTF_I_BAND_LAM)
+    flux_alpha_ztf_i_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, const.ZTF_I_BAND_WIDTH, const.ZTF_I_BAND_LAM)
 
     survey_names = (
         "ASASSN g band 2021 (Hβ)",
         "ASASSN g band 2022 (Hβ)",
         "Atlas o band 2021 (Hα)",
         "Atlas o band 2022 (Hα)",
-        "const.ZTF r band 2021 (Hα)",
-        "const.ZTF r band 2022 (Hα)"
+        "ZTF r band 2021 (Hα)",
+        "ZTF r band 2022 (Hα)",
+        "ZTF g band 2021 (Hβ)",
+        "ZTF g band 2022 (Hβ)",
+        "ZTF i band 2021 (Hα)",
+        "ZTF i band 2022 (Hα)"
     )
     int_flux_vals = [
         [flux_alpha_asassn_g_21_mjy, flux_alpha_asassn_g_21_mjy_err],
@@ -377,15 +389,23 @@ def pretty_print_flux_comparison(
         [flux_alpha_atlas_o_21_mjy, flux_alpha_atlas_o_21_mjy_err],
         [flux_alpha_atlas_o_22_mjy, flux_alpha_atlas_o_22_mjy_err],
         [flux_alpha_ztf_r_21_mjy, flux_alpha_ztf_r_21_mjy_err],
-        [flux_alpha_ztf_r_22_mjy, flux_alpha_ztf_r_22_mjy_err]
+        [flux_alpha_ztf_r_22_mjy, flux_alpha_ztf_r_22_mjy_err],
+        [flux_alpha_ztf_g_21_mjy, flux_alpha_ztf_g_21_mjy_err],
+        [flux_alpha_ztf_g_22_mjy, flux_alpha_ztf_g_22_mjy_err],
+        [flux_alpha_ztf_i_21_mjy, flux_alpha_ztf_i_21_mjy_err],
+        [flux_alpha_ztf_i_22_mjy, flux_alpha_ztf_i_22_mjy_err]
     ]
     num_gaussians_vals = (
         num_gaussians_beta_21,      # ASASSN g band 2021
         num_gaussians_beta_22,      # ASASSN g band 2022
         num_gaussians_alpha_21,     # Atlas o band 2021
         num_gaussians_alpha_22,     # Atlas o band 2022
-        num_gaussians_alpha_21,     # const.ZTF r band 2021
-        num_gaussians_alpha_22      # const.ZTF r band 2022
+        num_gaussians_alpha_21,     # ZTF r band 2021
+        num_gaussians_alpha_22,     # ZTF r band 2022
+        num_gaussians_beta_21,      # ZTF g band 2021
+        num_gaussians_beta_22,      # ZTF g band 2022
+        num_gaussians_alpha_21,     # ZTF i band 2021
+        num_gaussians_alpha_22      # ZTF i band 2022
     )
     photometric_flux_vals = [
         const.ASASSN_G_FLUX_21,
@@ -393,7 +413,11 @@ def pretty_print_flux_comparison(
         const.ATLAS_O_FLUX_21, 
         const.ATLAS_O_FLUX_22,
         const.ZTF_R_FLUX_21,
-        const.ZTF_R_FLUX_22
+        const.ZTF_R_FLUX_22,
+        const.ZTF_G_FLUX_21,
+        const.ZTF_G_FLUX_22,
+        const.ZTF_I_FLUX_21,
+        const.ZTF_I_FLUX_22
     ]
 
     int_flux_vals_micro_jy = np.array(int_flux_vals) * 1e3
@@ -402,8 +426,8 @@ def pretty_print_flux_comparison(
     # Column headers (in desired order)
     headers = [
         "Survey",
-        "Attenuated Photometric Flux (μJy)",
-        "Integrated Spectroscopic Flux (μJy)",
+        "Photometric Flux (μJy)",
+        "Integrated Spectroscopic Flux (μJy)^",
         "Number of Gaussians used to integrate"
     ]
 
@@ -441,6 +465,7 @@ def pretty_print_flux_comparison(
     for row in rows:
         print(make_row(row, col_widths, alignments))
     print("=" * table_width)
+    print("^ assuming top-hat filter response")
 
 def get_fwhm(x: np.ndarray, y_gaussian: np.ndarray, get_vel: bool = True) -> float:
     half_max = np.max(y_gaussian) / 2

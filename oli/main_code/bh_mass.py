@@ -6,7 +6,7 @@ import astropy.units as u
 from . import constants as const
 
 
-def get_luminosity(flux: float, flux_err: float, z: float = const.Z_SPEC) -> float:
+def get_luminosity(flux: float, flux_err: float, z: float = const.Z_LUM) -> float:
     dist = cosmo.luminosity_distance(z)
     dist_cm = dist.to(u.cm)
 

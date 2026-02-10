@@ -9,24 +9,31 @@ RA = 133.40525
 DEC = 5153/3000
 
 # Rest frame wavelengths
-OIII_1 = 4960.30
-OIII_2 = 5008.24
-NII_1 = 6549.85
-NII_2 = 6585.28
-SII_1 = 6718.29
-SII_2 = 6732.67
+OIII_WEAK = 4960.30
+OIII_STRONG = 5008.24
+NII_WEAK = 6549.85
+NII_STRONG = 6585.28
+SII_BLUE = 6718.29
+SII_RED = 6732.67
 H_ALPHA = 6564.61
 H_BETA = 4862.68
 
 # Bandpass effective central wavelengths and widths
+
+#https://svo2.cab.inta-csic.es/svo/theory/fps/index.php?id=Misc/Atlas.orange
 ATLAS_O_BAND_LAM = 6629.82
 ATLAS_O_BAND_WIDTH = 2368.06
+# https://svo2.cab.inta-csic.es/svo/theory/fps/index.php?mode=browse&gname=PAN-STARRS&asttype=
 ZTF_I_BAND_LAM = 7503.03
 ZTF_I_BAND_WIDTH = 1206.62
 ZTF_R_BAND_LAM = 6155.47
 ZTF_R_BAND_WIDTH = 1252.41
+ZTF_G_BAND_LAM = 4810.16
+ZTF_G_BAND_WIDTH = 1053.08
+# https://svo2.cab.inta-csic.es/svo/theory/fps/index.php?id=Generic/Johnson.V
 ASASSN_V_BAND_LAM = 5467.57
 ASASSN_V_BAND_WIDTH = 889.80
+# https://svo2.cab.inta-csic.es/svo/theory/fps/index.php?id=SLOAN/SDSS.g
 ASASSN_G_BAND_LAM = 4671.78
 ASASSN_G_BAND_WIDTH = 1064.68
 
@@ -40,12 +47,21 @@ C_M_S = 2.99792458e8 # m/s
 C_ANG_S = 2.99792458e18 # Ang/s
 
 # Photometry values - in mJy
-ZTF_R_FLUX_21 = 0.0358
-ZTF_R_FLUX_22 = -0.0187
-ATLAS_O_FLUX_21 = 0.0452
-ATLAS_O_FLUX_22 = 0.0023
+ZTF_R_FLUX_21 = 0.0049
+ZTF_R_FLUX_22 = -0.0229
+ZTF_G_FLUX_21 = 0.0052
+ZTF_G_FLUX_22 = -0.0155
+ZTF_I_FLUX_21 = -0.0203 # don't trust these values too much
+ZTF_I_FLUX_22 = -0.0502 # don't trust these values too much
+ATLAS_O_FLUX_21 = 0.0526
+ATLAS_O_FLUX_22 = -0.0061
 ASASSN_G_FLUX_21 = -0.0172
 ASASSN_G_FLUX_22 = -0.0301
+
+BAD_ZTF_R_FLUX_21 = 0.0358
+BAD_ZTF_R_FLUX_22 = -0.0187
+BAD_ATLAS_O_FLUX_21 = 0.0452
+BAD_ATLAS_O_FLUX_22 = 0.0023
 
 YASMEEN_RESULTS = { # (value, error)
     "fwhm_alpha_15": (2143, 60),            # km/s
@@ -89,7 +105,7 @@ SMOOTH_FACTOR = 1.0
 PLOT_TITLES = False
 SAVE_FIGS = False
 FIG_OUTPUT_DIR = "output/"
-VEL_PLOT_WIDTH = 2.5 * VEL_TO_IGNORE_WIDTH
+VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
 LINEWIDTH = 0.5
 FIG_SIZE = (10,6)
 ERR_OPAC = 0.1
@@ -112,7 +128,9 @@ FNAME_2015_BLUE_4_ARCSEC = "323854_A_spectrum_4-arcsec_blue.fits"
 FNAME_2015_RED_4_ARCSEC = "323854_A_spectrum_4-arcsec_red.fits"
 
 VEL_LABEL = r"Velocity (km$\text{s}^{-1}$)"
-ANG_LABEL = r"Wavelength ($\mathrm{\AA}$)"
+BASE_ANG_LABEL = r"wavelength ($\mathrm{\AA}$)"
+ANG_LABEL = "Observed " + BASE_ANG_LABEL
+REST_ANG_LABEL = "Rest frame " + BASE_ANG_LABEL
 SFD_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻² Å⁻¹"
 FLUX_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻²"
 FLUX_UNITS = r"$10^{-17}$ erg $\text{s}^{-1}$ $\text{cm}^{-2}$"
