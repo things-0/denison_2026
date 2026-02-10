@@ -3,10 +3,10 @@ from astropy.cosmology import Planck18 as cosmo
 from astropy.cosmology import FlatLambdaCDM
 import astropy.units as u
 
-from .constants import *
+from . import constants as const
 
 
-def get_luminosity(flux: float, flux_err: float, z: float = Z_SPEC) -> float:
+def get_luminosity(flux: float, flux_err: float, z: float = const.Z_SPEC) -> float:
     dist = cosmo.luminosity_distance(z)
     dist_cm = dist.to(u.cm)
 

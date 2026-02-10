@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from .constants import *
+from . import constants as const
 
 def clip_sami_blue_edge(
     unclipped_sami_flux: np.ndarray,
@@ -98,7 +98,7 @@ def gaussian_blur_before_resampling(
             # print(f"Spread low res: {spread_low}, Spread high res: {spread_high}")
             #
 
-            if sigma_kernel_sq > EPS:
+            if sigma_kernel_sq > const.EPS:
                 #TD: remove testing
                 # print(f"sigma_kernel_sq: {sigma_kernel_sq}", flush=True)
                 n_smoothed += 1
@@ -161,7 +161,7 @@ def gaussian_blur_after_resampling(
         
         sigma_pix = np.median(sigma_kernel_arr[start:end]) / wavelength_step
         
-        if sigma_pix > EPS:
+        if sigma_pix > const.EPS:
             temp_blurred = gaussian_filter1d(flux_high_res, sigma=sigma_pix)
             #TD: remove testing
             # plt.plot(lam, flux_high_res)

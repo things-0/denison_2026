@@ -25,10 +25,10 @@ ZTF_I_BAND_LAM = 7503.03
 ZTF_I_BAND_WIDTH = 1206.62
 ZTF_R_BAND_LAM = 6155.47
 ZTF_R_BAND_WIDTH = 1252.41
-ASSASN_V_BAND_LAM = 5467.57
-ASSASN_V_BAND_WIDTH = 889.80
-ASSASN_G_BAND_LAM = 4671.78
-ASSASN_G_BAND_WIDTH = 1064.68
+ASASSN_V_BAND_LAM = 5467.57
+ASASSN_V_BAND_WIDTH = 889.80
+ASASSN_G_BAND_LAM = 4671.78
+ASASSN_G_BAND_WIDTH = 1064.68
 
 """
 ASAS-SN uses Sloan g-band filters with an effective central
@@ -71,6 +71,7 @@ TEST_NUM_MC_TRIALS = 50
 
 TOTAL_LAM_BOUNDS = (3900, 9000)
 VEL_TO_IGNORE_WIDTH = 7000
+POLY_FIT_BIN_WIDTH = 50 # angstrom
 
 # Gaussian fitting parameters
 MAXFEV = 2100 # default is 1600
@@ -85,9 +86,12 @@ SMOOTH_FACTOR = 1.0
 #
 
 # Plotting parameters
+PLOT_TITLES = False
+SAVE_FIGS = False
+FIG_OUTPUT_DIR = "output/"
 VEL_PLOT_WIDTH = 2.5 * VEL_TO_IGNORE_WIDTH
 LINEWIDTH = 0.5
-FIG_SIZE = (10,4)
+FIG_SIZE = (10,6)
 ERR_OPAC = 0.1
 FILL_BETWEEN_OPAC = 0.5
 COLOUR_MAP = plt.cm.tab10
@@ -112,7 +116,7 @@ ANG_LABEL = r"Wavelength ($\AA$)"
 SFD_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻² Å⁻¹"
 FLUX_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻²"
 FLUX_UNITS = r"$10^{-17}$ erg $\text{s}^{-1}$ $\text{cm}^{-2}$"
-SFD_UNITS = FLUX_UNITS + r" $\AA^{-1}$"
+SFD_UNITS = FLUX_UNITS + r" ${\AA}^{-1}$"
 # SFD_Y_AX_LABEL = f"Spectral flux density ({SFD_UNITS})"
 SFD_Y_AX_LABEL = r"$F_{\lambda}$ " + f"({SFD_UNITS})"
 

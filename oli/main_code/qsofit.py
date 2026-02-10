@@ -7,7 +7,7 @@ from astropy.io import fits
 import sys
 sys.path.append("/Users/o_thorp/Downloads/my_stuff/Uni/other/scholarships/denison_2026/oli")
 
-from main_code.constants import *
+from . import constants as const
 from main_code.helpers import get_new_qso_filename
 
 def edit_qsopar(

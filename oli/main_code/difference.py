@@ -1,6 +1,6 @@
 import numpy as np
 
-from .constants import *
+from . import constants as const
 from .data_reading import get_adjusted_data
 from .polynomial_fit import apply_poly_fit
 from .plotting import plot_vert_emission_lines

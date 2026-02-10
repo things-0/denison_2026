@@ -1,10 +1,10 @@
 import numpy as np
 import scipy as sp
 
-from .constants import *
+from . import constants as const
 
 #Conversion from FWHM to Gaussian sigma
-FWHM_sigma=1/SIGMA_TO_FWHM
+FWHM_sigma=1/const.SIGMA_TO_FWHM
 
 ##A Gaussian function
 #x=independenat variable
@@ -89,7 +89,7 @@ def blur_spectrum(wavelength,spec,res_in,res_out,disp_cor=0):
     return spec_smooth/transfer_smooth
 
 def flam_fnu(wave,flam):
-    return (flam*wave**2)/(C_ANG_S)
+    return (flam*wave**2)/(const.C_ANG_S)
 
 ##D4000 index
 #wave=wavelength scale
@@ -121,7 +121,7 @@ def D4000_w_errs(wave,spec,var,z,res=None):
     d4000=d2/d1
     #Compute errors. Need variance spectrum first...
     ##
-    var=var*((wave**2)/(C_ANG_S))**2
+    var=var*((wave**2)/(const.C_ANG_S))**2
     var=flux_per_pix(wave,var) #conversion from wavelength to frequency
     var=flux_per_pix(wave,var) #I have to do this twice becasue you multiply variance by square of number
     #var_ind1=array_if(var,(wave>=lick_window['D4000_1'][0]*(1+z)) & (wave<=lick_window['D4000_1'][1]*(1+z)))
@@ -213,7 +213,7 @@ def get_results(
     variances: list[np.ndarray],
     years: list[str] = ["2001", "2015", "2021", "2022"],
     idx_names: list[str] = ["D4000", "Hbeta", "Mg_b", "Fe4383"],
-    z: float = Z_SPEC,
+    z: float = const.Z_SPEC,
     print_results: bool = True
 ) -> ...:
 

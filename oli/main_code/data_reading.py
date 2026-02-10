@@ -5,16 +5,16 @@ import spectres
 import warnings
 
 from .adjust_calibration import gaussian_blur_before_resampling, gaussian_blur_after_resampling, clip_sami_blue_edge
-from .constants import *
+from . import constants as const
 from .helpers import get_min_res
 from .plotting import plot_min_res, plot_spectra, plot_vert_emission_lines
 
 def get_sami_lam_flux_err(
     fname: str,
-    folder_name: str = SAMI_FOLDER_NAME,
+    folder_name: str = const.SAMI_FOLDER_NAME,
     filter_bad_values: bool = True,
     interpolate_bad_values: bool = False,
-    lam_bounds: tuple[float, float] | None = TOTAL_LAM_BOUNDS,
+    lam_bounds: tuple[float, float] | None = const.TOTAL_LAM_BOUNDS,
     flux_power_of_10: int = 17,
     lam_in_vacuum: bool = True,
     doareacorr: bool = False,
@@ -74,8 +74,8 @@ def get_sami_lam_flux_err(
     bad_mask = (
         # ~np.isfinite(lam) | #TODO: remove?
         not_in_lam_bounds |
-        ~np.isfinite(flux_valid) | (flux_valid > MAX_FLUX) | (flux_valid < MIN_FLUX) |
-        ~np.isfinite(err_valid) | (err_valid <= 0) | (err_valid > MAX_FLUX)
+        ~np.isfinite(flux_valid) | (flux_valid > const.MAX_FLUX) | (flux_valid < const.MIN_FLUX) |
+        ~np.isfinite(err_valid) | (err_valid <= 0) | (err_valid > const.MAX_FLUX)
     )
     good_mask = ~bad_mask
 
@@ -92,10 +92,10 @@ def get_sami_lam_flux_err(
 
 def get_sdss_lam_flux_err(
     fname: str,
-    folder_name: str = SDSS_FOLDER_NAME,
+    folder_name: str = const.SDSS_FOLDER_NAME,
     filter_bad_values: bool = True,
     interpolate_bad_values: bool = False,
-    lam_bounds: tuple[float, float] | None = TOTAL_LAM_BOUNDS,
+    lam_bounds: tuple[float, float] | None = const.TOTAL_LAM_BOUNDS,
     flux_power_of_10: int = 17,
     get_other_data: bool = False
 ) -> (
@@ -167,8 +167,8 @@ def get_sdss_lam_flux_err(
             not_in_lam_bounds = (lam_valid < lam_bounds[0]) | (lam_valid > lam_bounds[1])
         bad_mask = (
             not_in_lam_bounds |
-            ~np.isfinite(flux_valid) | (flux_valid > MAX_FLUX) | (flux_valid < MIN_FLUX) |
-            ~np.isfinite(err_valid) | (err_valid <= 0) | (err_valid > MAX_FLUX)
+            ~np.isfinite(flux_valid) | (flux_valid > const.MAX_FLUX) | (flux_valid < const.MIN_FLUX) |
+            ~np.isfinite(err_valid) | (err_valid <= 0) | (err_valid > const.MAX_FLUX)
         )
         good_mask = ~bad_mask
         if interpolate_bad_values:
@@ -259,7 +259,7 @@ def sdss_read(
     hdulist.close()
 
     # define parts of spectrum where data is likely to be good:
-    idx = np.where((sdss_lam>TOTAL_LAM_BOUNDS[0]) & (sdss_lam<TOTAL_LAM_BOUNDS[1]))
+    idx = np.where((sdss_lam>const.TOTAL_LAM_BOUNDS[0]) & (sdss_lam<const.TOTAL_LAM_BOUNDS[1]))
     sdss_flux = sdss_flux[idx]
     sdss_lam = sdss_lam[idx]
     sdss_ivar = sdss_ivar[idx]
@@ -286,13 +286,13 @@ def get_adjusted_data(
     resampled_xlim: tuple[float, float] | None = None,
     resampled_and_blurred_xlim: tuple[float, float] | None = None,
     resampled_and_blurred_vlines: dict[str, float] | None = None,
-    sdss_folder_name: str = SDSS_FOLDER_NAME,
-    sami_folder_name: str = SAMI_FOLDER_NAME,
-    fname_2001: str = FNAME_2001,
-    fname_2015_blue: str = FNAME_2015_BLUE_3_ARCSEC,
-    fname_2015_red: str = FNAME_2015_RED_3_ARCSEC,
-    fname_2021: str = FNAME_2021,
-    fname_2022: str = FNAME_2022
+    sdss_folder_name: str = const.SDSS_FOLDER_NAME,
+    sami_folder_name: str = const.SAMI_FOLDER_NAME,
+    fname_2001: str = const.FNAME_2001,
+    fname_2015_blue: str = const.FNAME_2015_BLUE_3_ARCSEC,
+    fname_2015_red: str = const.FNAME_2015_RED_3_ARCSEC,
+    fname_2021: str = const.FNAME_2021,
+    fname_2022: str = const.FNAME_2022
 ) -> (
     tuple[np.ndarray, tuple[
         np.ndarray, np.ndarray
@@ -425,8 +425,8 @@ def get_adjusted_data(
         flux01_blurred = gaussian_blur_before_resampling(res_min, res_01, lam01, lam01, flux01)
         flux21_blurred = gaussian_blur_before_resampling(res_min, res_21, lam01, lam21, flux21)
         flux22_blurred = gaussian_blur_before_resampling(res_min, res_22, lam01, lam22, flux22)
-        flux15_red_blurred = gaussian_blur_before_resampling(res_min, RES_15_RED, lam01, lam15_red, flux15_red)
-        flux15_blue_blurred = gaussian_blur_before_resampling(res_min, RES_15_BLUE, lam01, lam15_blue_clipped, flux15_blue_clipped)
+        flux15_red_blurred = gaussian_blur_before_resampling(res_min, const.RES_15_RED, lam01, lam15_red, flux15_red)
+        flux15_blue_blurred = gaussian_blur_before_resampling(res_min, const.RES_15_BLUE, lam01, lam15_blue_clipped, flux15_blue_clipped)
 
         if plot_just_blurred:
             plot_spectra(
@@ -525,8 +525,8 @@ def get_adjusted_data(
         flux01_resampled_blurred = gaussian_blur_after_resampling(res_min, res_01, lam01, flux01_resampled, wavelength_step)
         flux21_resampled_blurred = gaussian_blur_after_resampling(res_min, res_21, lam01, flux21_resampled, wavelength_step)
         flux22_resampled_blurred = gaussian_blur_after_resampling(res_min, res_22, lam01, flux22_resampled, wavelength_step)
-        flux15_red_resampled_blurred = gaussian_blur_after_resampling(res_min, RES_15_RED, lam01, flux15_red_resampled, wavelength_step)
-        flux15_blue_resampled_blurred = gaussian_blur_after_resampling(res_min, RES_15_BLUE, lam01, flux15_blue_resampled, wavelength_step)
+        flux15_red_resampled_blurred = gaussian_blur_after_resampling(res_min, const.RES_15_RED, lam01, flux15_red_resampled, wavelength_step)
+        flux15_blue_resampled_blurred = gaussian_blur_after_resampling(res_min, const.RES_15_BLUE, lam01, flux15_blue_resampled, wavelength_step)
 
         flux15_resampled_blurred = np.fmax(flux15_blue_resampled_blurred, flux15_red_resampled_blurred)
         if (

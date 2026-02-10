@@ -5,7 +5,7 @@ import scipy.optimize as spo
 import warnings
 from matplotlib.colors import Colormap
 
-from .constants import *
+from . import constants as const
 from .helpers import (
     get_fwhm, get_masked_diffs,
     get_default_bounds, get_vel_lam_mask   
@@ -42,7 +42,7 @@ def get_initial_guesses(
     fwhm_guesses_unitless, _, _, _ = sps.peak_widths(y, peak_indices, rel_height=0.5) # returns width in indices at half max
     peak_x_diffs = get_masked_diffs(x, peak_indices)
     fwhm_guesses = fwhm_guesses_unitless * peak_x_diffs
-    sigma_guesses = fwhm_guesses / SIGMA_TO_FWHM
+    sigma_guesses = fwhm_guesses / const.SIGMA_TO_FWHM
 
     min_height = bounds[0][0]
     min_mu = bounds[0][num_gaussians]
@@ -88,13 +88,13 @@ def fit_gaussians(
     x_untrimmed: np.ndarray,
     y_untrimmed: np.ndarray,
     y_errs_untrimmed: np.ndarray | None = None,
-    num_gaussians: int = DEFAULT_NUM_GAUSSIANS,
-    n_mc_trials: int = NUM_MC_TRIALS,
-    max_func_ev: int = MAXFEV,
+    num_gaussians: int = const.DEFAULT_NUM_GAUSSIANS,
+    n_mc_trials: int = const.NUM_MC_TRIALS,
+    max_func_ev: int = const.MAXFEV,
     lower_bounds: list[float] | None = None,
     upper_bounds: list[float] | None = None,
     set_bounds_to_default: bool = True,
-    mask_vel_width: float | None = VEL_WIDTH_GAUSSIAN_FIT,
+    mask_vel_width: float | None = const.VEL_WIDTH_GAUSSIAN_FIT,
     mask_lam_centre: float | None = None,
     calculate_mean_fwhm: bool = False,
     use_best_fit_params_for_mc: bool = False, # faster and less accurate (smaller) errors if True
@@ -102,11 +102,12 @@ def fit_gaussians(
     plot_fit: bool = False,
     plot_y_errs: bool = True,
     plot_summed_gaussian_errs: bool = False,
-    colour_map: Colormap = COLOUR_MAP,
-    error_opacity: float = ERR_OPAC,
-    y_axis_label: str = SFD_Y_AX_LABEL,
-    x_axis_label: str = ANG_LABEL,
-    title: str | None = None
+    colour_map: Colormap = const.COLOUR_MAP,
+    error_opacity: float = const.ERR_OPAC,
+    y_axis_label: str = const.SFD_Y_AX_LABEL,
+    x_axis_label: str = const.ANG_LABEL,
+    title: str | None = None,
+    save_fig_name: str | None = ""
 ) -> tuple[
     np.ndarray, np.ndarray | None,
     np.ndarray[np.ndarray], float | None,
@@ -224,7 +225,8 @@ def fit_gaussians(
             y_axis_label=y_axis_label,
             x_axis_label=x_axis_label,
             error_opacity=error_opacity,
-            colour_map=colour_map
+            colour_map=colour_map,
+            save_fig_name=save_fig_name
         )
     
     return (
@@ -244,7 +246,7 @@ def get_mc_errs_perturb_y(
     lower_bounds: list[float],
     upper_bounds: list[float],
     best_fit_y: np.ndarray, # used for bias calculation
-    n_mc_trials: int = NUM_MC_TRIALS,
+    n_mc_trials: int = const.NUM_MC_TRIALS,
     calculate_mean_fwhm: bool = False,
     print_warnings: bool = False,
 ) -> tuple[np.ndarray, float | None, float | None, np.ndarray, np.ndarray]:
@@ -305,7 +307,7 @@ def get_mc_errs_perturb_params(
     best_fit_params: np.ndarray,
     param_cov_matrix: np.ndarray,
     num_gaussians: int,
-    n_trials: int = NUM_MC_TRIALS
+    n_trials: int = const.NUM_MC_TRIALS
 ) -> np.ndarray:
 
     # Sample parameters from multivariate normal using covariance matrix

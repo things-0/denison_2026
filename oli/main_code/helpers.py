@@ -2,11 +2,11 @@ import numpy as np
 import os
 import ast
 
-from .constants import *
+from . import constants as const
 
 def convert_lam_to_vel(
     lam: np.ndarray | float,
-    lam_centre_rest_frame: float = H_ALPHA,
+    lam_centre_rest_frame: float = const.H_ALPHA,
     lam_is_rest_frame: bool = False
 ) -> np.ndarray | float:
     """
@@ -17,13 +17,13 @@ def convert_lam_to_vel(
     """
     # v = c * Δλ / λ_cent
     if lam_is_rest_frame:
-        return (lam - lam_centre_rest_frame) * C_KM_S / lam_centre_rest_frame
+        return (lam - lam_centre_rest_frame) * const.C_KM_S / lam_centre_rest_frame
     else:
-        return (lam / (1 + Z_SPEC) - lam_centre_rest_frame) * C_KM_S / lam_centre_rest_frame
+        return (lam / (1 + const.Z_SPEC) - lam_centre_rest_frame) * const.C_KM_S / lam_centre_rest_frame
 
 def convert_vel_to_lam(
     vel: np.ndarray | float,
-    lam_centre_rest_frame: float = H_ALPHA,
+    lam_centre_rest_frame: float = const.H_ALPHA,
     return_rest_frame: bool = False
 ) -> np.ndarray | float:
     """
@@ -31,17 +31,17 @@ def convert_vel_to_lam(
     """
     # λ = λ_cent * (1 + v / c)
     if return_rest_frame:
-        return lam_centre_rest_frame * (1 + vel / C_KM_S)
+        return lam_centre_rest_frame * (1 + vel / const.C_KM_S)
     else:
-        return (lam_centre_rest_frame * (1 + vel / C_KM_S)) * (1 + Z_SPEC)
+        return (lam_centre_rest_frame * (1 + vel / const.C_KM_S)) * (1 + const.Z_SPEC)
 
 def get_lam_bounds(lam: float, width: float, is_rest_frame: bool = True, width_is_vel: bool = False) -> tuple[float, float]:
     if is_rest_frame:
-        obs_lam = lam * (1+Z_SPEC)
+        obs_lam = lam * (1+const.Z_SPEC)
         rest_lam = lam
     else:
         obs_lam = lam
-        rest_lam = lam/(1+Z_SPEC)
+        rest_lam = lam/(1+const.Z_SPEC)
     if width_is_vel:
         left = convert_vel_to_lam(-width / 2, lam_centre_rest_frame=rest_lam)
         right = convert_vel_to_lam(width / 2, lam_centre_rest_frame=rest_lam)
@@ -67,7 +67,7 @@ def get_min_res(
     )
     #
 
-    res_min =  res_min / SMOOTH_FACTOR
+    res_min =  res_min / const.SMOOTH_FACTOR
 
     return res_min
 
@@ -256,7 +256,7 @@ def convert_flux_to_mJy(
     
     # Calculate frequency width in Hz
     # Using c_ang_s (speed of light in Å/s) for consistent units
-    freq_eff_width = C_ANG_S * col_band_eff_width / (col_band_eff_lam**2)  # Hz
+    freq_eff_width = const.C_ANG_S * col_band_eff_width / (col_band_eff_lam**2)  # Hz
     
     # Calculate flux density
     flux_density = flux / freq_eff_width  # erg s^-1 cm^-2 Hz^-1
@@ -303,13 +303,13 @@ def get_default_bounds(
     y: np.ndarray,
     num_of_gaussians: int
 ) -> tuple[list[float], list[float]]: # ([h_min * n, μ_min * n, σ_min * n], [h_max * n, μ_max * n, σ_max * n])
-    height_min = HEIGHT_MIN
+    height_min = const.HEIGHT_MIN
     height_max = 2 * np.max(y)
     x_range = x[-1] - x[0]
-    mu_min = x[0] + x_range * MIN_MU
-    mu_max = x[-1] - x_range * MIN_MU
-    sigma_min = PEAK_MIN_RANGE * x_range / SIGMA_TO_FWHM
-    sigma_max = x_range / SIGMA_TO_FWHM
+    mu_min = x[0] + x_range * const.MIN_MU
+    mu_max = x[-1] - x_range * const.MIN_MU
+    sigma_min = const.PEAK_MIN_RANGE * x_range / const.SIGMA_TO_FWHM
+    sigma_max = x_range / const.SIGMA_TO_FWHM
 
     lower_bounds = (
         [height_min] * num_of_gaussians +
@@ -349,31 +349,31 @@ def pretty_print_flux_comparison(
     num_gaussians_beta_22: int
 ) -> str:
 
-    flux_alpha_assasn_g_21_mjy = convert_flux_to_mJy(flux_beta_21, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
-    flux_alpha_assasn_g_21_mjy_err = convert_flux_to_mJy(flux_beta_21_err, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
-    flux_alpha_atlas_o_21_mjy = convert_flux_to_mJy(flux_alpha_21, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
-    flux_alpha_atlas_o_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
-    flux_alpha_ztf_r_21_mjy = convert_flux_to_mJy(flux_alpha_21, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
-    flux_alpha_ztf_r_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
+    flux_alpha_asassn_g_21_mjy = convert_flux_to_mJy(flux_beta_21, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
+    flux_alpha_asassn_g_21_mjy_err = convert_flux_to_mJy(flux_beta_21_err, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
+    flux_alpha_atlas_o_21_mjy = convert_flux_to_mJy(flux_alpha_21, const.ATLAS_O_BAND_WIDTH, const.ATLAS_O_BAND_LAM)
+    flux_alpha_atlas_o_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, const.ATLAS_O_BAND_WIDTH, const.ATLAS_O_BAND_LAM)
+    flux_alpha_ztf_r_21_mjy = convert_flux_to_mJy(flux_alpha_21, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
+    flux_alpha_ztf_r_21_mjy_err = convert_flux_to_mJy(flux_alpha_21_err, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
 
-    flux_alpha_assasn_g_22_mjy = convert_flux_to_mJy(flux_beta_22, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
-    flux_alpha_assasn_g_22_mjy_err = convert_flux_to_mJy(flux_beta_22_err, ASSASN_G_BAND_WIDTH, ASSASN_G_BAND_LAM)
-    flux_alpha_atlas_o_22_mjy = convert_flux_to_mJy(flux_alpha_22, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
-    flux_alpha_atlas_o_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, ATLAS_O_BAND_WIDTH, ATLAS_O_BAND_LAM)
-    flux_alpha_ztf_r_22_mjy = convert_flux_to_mJy(flux_alpha_22, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
-    flux_alpha_ztf_r_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, ZTF_R_BAND_WIDTH, ZTF_R_BAND_LAM)
+    flux_alpha_asassn_g_22_mjy = convert_flux_to_mJy(flux_beta_22, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
+    flux_alpha_asassn_g_22_mjy_err = convert_flux_to_mJy(flux_beta_22_err, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
+    flux_alpha_atlas_o_22_mjy = convert_flux_to_mJy(flux_alpha_22, const.ATLAS_O_BAND_WIDTH, const.ATLAS_O_BAND_LAM)
+    flux_alpha_atlas_o_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, const.ATLAS_O_BAND_WIDTH, const.ATLAS_O_BAND_LAM)
+    flux_alpha_ztf_r_22_mjy = convert_flux_to_mJy(flux_alpha_22, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
+    flux_alpha_ztf_r_22_mjy_err = convert_flux_to_mJy(flux_alpha_22_err, const.ZTF_R_BAND_WIDTH, const.ZTF_R_BAND_LAM)
 
     survey_names = (
         "ASASSN g band 2021 (Hβ)",
         "ASASSN g band 2022 (Hβ)",
         "Atlas o band 2021 (Hα)",
         "Atlas o band 2022 (Hα)",
-        "ZTF r band 2021 (Hα)",
-        "ZTF r band 2022 (Hα)"
+        "const.ZTF r band 2021 (Hα)",
+        "const.ZTF r band 2022 (Hα)"
     )
     int_flux_vals = [
-        [flux_alpha_assasn_g_21_mjy, flux_alpha_assasn_g_21_mjy_err],
-        [flux_alpha_assasn_g_22_mjy, flux_alpha_assasn_g_22_mjy_err],
+        [flux_alpha_asassn_g_21_mjy, flux_alpha_asassn_g_21_mjy_err],
+        [flux_alpha_asassn_g_22_mjy, flux_alpha_asassn_g_22_mjy_err],
         [flux_alpha_atlas_o_21_mjy, flux_alpha_atlas_o_21_mjy_err],
         [flux_alpha_atlas_o_22_mjy, flux_alpha_atlas_o_22_mjy_err],
         [flux_alpha_ztf_r_21_mjy, flux_alpha_ztf_r_21_mjy_err],
@@ -384,16 +384,16 @@ def pretty_print_flux_comparison(
         num_gaussians_beta_22,      # ASASSN g band 2022
         num_gaussians_alpha_21,     # Atlas o band 2021
         num_gaussians_alpha_22,     # Atlas o band 2022
-        num_gaussians_alpha_21,     # ZTF r band 2021
-        num_gaussians_alpha_22      # ZTF r band 2022
+        num_gaussians_alpha_21,     # const.ZTF r band 2021
+        num_gaussians_alpha_22      # const.ZTF r band 2022
     )
     photometric_flux_vals = [
-        ASASSN_G_FLUX_21,
-        ASASSN_G_FLUX_22,
-        ATLAS_O_FLUX_21, 
-        ATLAS_O_FLUX_22,
-        ZTF_R_FLUX_21,
-        ZTF_R_FLUX_22
+        const.ASASSN_G_FLUX_21,
+        const.ASASSN_G_FLUX_22,
+        const.ATLAS_O_FLUX_21, 
+        const.ATLAS_O_FLUX_22,
+        const.ZTF_R_FLUX_21,
+        const.ZTF_R_FLUX_22
     ]
 
     int_flux_vals_micro_jy = np.array(int_flux_vals) * 1e3
@@ -452,7 +452,7 @@ def get_fwhm(x: np.ndarray, y_gaussian: np.ndarray, get_vel: bool = True) -> flo
     fwhm_ang = lam_right - lam_left
     if get_vel is False:
         return fwhm_ang
-    lam_centre_rest_frame = ((lam_right + lam_left) / 2) / (1 + Z_SPEC)
+    lam_centre_rest_frame = ((lam_right + lam_left) / 2) / (1 + const.Z_SPEC)
     #TD: remove testing
     # lcrf_option_1 = (x[np.argmax(y_gaussian)]) / (1 + Z_SPEC)
     # lcrf_option_2 = ((lam_right + lam_left) / 2) / (1 + Z_SPEC)
@@ -482,18 +482,18 @@ def compare_yasmeen_results(
     bh_mass_21: tuple[float, float] | None = None
 ) -> None:
     all_results = {
-        "FWHM Hα 2015 (km/s)": (fwhm_alpha_15, YASMEEN_RESULTS["fwhm_alpha_15"]),
-        "FWHM Hα 2021 (km/s)": (fwhm_alpha_21, YASMEEN_RESULTS["fwhm_alpha_21"]),
-        "FWHM Hβ 2015 (km/s)": (fwhm_beta_15, YASMEEN_RESULTS["fwhm_beta_15"]),
-        "FWHM Hβ 2021 (km/s)": (fwhm_beta_21, YASMEEN_RESULTS["fwhm_beta_21"]),
-        "Flux Hα 2015 (1e-17 ergs/s/cm^2)": (flux_alpha_15, YASMEEN_RESULTS["flux_alpha_15"]),
-        "Flux Hα 2021 (1e-17 ergs/s/cm^2)": (flux_alpha_21, YASMEEN_RESULTS["flux_alpha_21"]),
-        "Luminosity Hα 2015 (1e40 ergs/s)": (luminosity_alpha_15, YASMEEN_RESULTS["luminosity_alpha_15"]),
-        "Luminosity Hα 2021 (1e40 ergs/s)": (luminosity_alpha_21, YASMEEN_RESULTS["luminosity_alpha_21"]),
-        "Balmer decrement Hα 2015": (bd_15, YASMEEN_RESULTS["bd_15"]),
-        "Balmer decrement Hα 2021": (bd_21, YASMEEN_RESULTS["bd_21"]),
-        "BH mass 2015 (1e6 M_sun)": (bh_mass_15, YASMEEN_RESULTS["bh_mass_15"]),
-        "BH mass 2021 (1e6 M_sun)": (bh_mass_21, YASMEEN_RESULTS["bh_mass_21"])
+        "FWHM Hα 2015 (km/s)": (fwhm_alpha_15, const.YASMEEN_RESULTS["fwhm_alpha_15"]),
+        "FWHM Hα 2021 (km/s)": (fwhm_alpha_21, const.YASMEEN_RESULTS["fwhm_alpha_21"]),
+        "FWHM Hβ 2015 (km/s)": (fwhm_beta_15, const.YASMEEN_RESULTS["fwhm_beta_15"]),
+        "FWHM Hβ 2021 (km/s)": (fwhm_beta_21, const.YASMEEN_RESULTS["fwhm_beta_21"]),
+        "Flux Hα 2015 (1e-17 ergs/s/cm^2)": (flux_alpha_15, const.YASMEEN_RESULTS["flux_alpha_15"]),
+        "Flux Hα 2021 (1e-17 ergs/s/cm^2)": (flux_alpha_21, const.YASMEEN_RESULTS["flux_alpha_21"]),
+        "Luminosity Hα 2015 (1e40 ergs/s)": (luminosity_alpha_15, const.YASMEEN_RESULTS["luminosity_alpha_15"]),
+        "Luminosity Hα 2021 (1e40 ergs/s)": (luminosity_alpha_21, const.YASMEEN_RESULTS["luminosity_alpha_21"]),
+        "Balmer decrement Hα 2015": (bd_15, const.YASMEEN_RESULTS["bd_15"]),
+        "Balmer decrement Hα 2021": (bd_21, const.YASMEEN_RESULTS["bd_21"]),
+        "BH mass 2015 (1e6 M_sun)": (bh_mass_15, const.YASMEEN_RESULTS["bh_mass_15"]),
+        "BH mass 2021 (1e6 M_sun)": (bh_mass_21, const.YASMEEN_RESULTS["bh_mass_21"])
     }
     
     col1_width = 35
@@ -543,19 +543,19 @@ def get_output_file_name(
     fname: str, # without extension
     folder_name: str = "pyqsofit_code/output/",
 ) -> str:
-    if fname == FNAME_2001:
+    if fname == const.FNAME_2001:
         output_name = "SDSS_2001"
-    elif fname == FNAME_2021:
+    elif fname == const.FNAME_2021:
         output_name = "SDSS_2021"
-    elif fname == FNAME_2022:
+    elif fname == const.FNAME_2022:
         output_name = "SDSS_2022"
-    elif fname == FNAME_2015_BLUE_3_ARCSEC:
+    elif fname == const.FNAME_2015_BLUE_3_ARCSEC:
         output_name = "SAMI_BLUE_3_ARCSEC"
-    elif fname == FNAME_2015_RED_3_ARCSEC:
+    elif fname == const.FNAME_2015_RED_3_ARCSEC:
         output_name = "SAMI_RED_3_ARCSEC"
-    elif fname == FNAME_2015_BLUE_4_ARCSEC:
+    elif fname == const.FNAME_2015_BLUE_4_ARCSEC:
         output_name = "SAMI_BLUE_4_ARCSEC"
-    elif fname == FNAME_2015_RED_4_ARCSEC:
+    elif fname == const.FNAME_2015_RED_4_ARCSEC:
         output_name = "SAMI_RED_4_ARCSEC"
     else:
         raise NotImplementedError(f"Invalid filename: {fname}")
@@ -585,24 +585,24 @@ def get_kwargs_from_log(
 ) -> dict:
     with open(log_name, "r") as f:
         keys = f.readline().strip().split(";")
-        if keys != COMBINED_KEYS:
+        if keys != const.COMBINED_KEYS:
             print(keys)
-            print(COMBINED_KEYS)
-            raise ValueError("Keys in log file do not match COMBINED_KEYS")
-        output_file_name_index = COMBINED_KEYS.index("output_file_name") # should be 0
+            print(const.COMBINED_KEYS)
+            raise ValueError("Keys in log file do not match const.COMBINED_KEYS")
+        output_file_name_index = const.COMBINED_KEYS.index("output_file_name") # should be 0
         for line in f:
             vals_str = line.strip().split(";")
             vals = []
             if output_file_name == vals_str[output_file_name_index]:
                 if exclude_log_items:
-                    new_keys = FIT_KEYS.copy()
+                    new_keys = const.FIT_KEYS.copy()
                 else:
                     new_keys = keys
 
                 for i, val_str in enumerate(vals_str):
                     if (
                         exclude_log_items and
-                        COMBINED_KEYS[i] in LOG_KEYS and
+                        const.COMBINED_KEYS[i] in const.LOG_KEYS and
                         i != output_file_name_index
                     ):
                         continue
@@ -660,11 +660,10 @@ def get_scaled_y_bounds(
     y2: np.ndarray | None = None,
     ax1_y_bounds: tuple[float, float] | None = None,
     ax2_y_bounds: tuple[float | None, float | None] | None = None,
-    align_maxes: bool = True,
     fix_y2_top: bool = True,
     y_val_line_up: float = 0.0,
-    y_top_scale_factor: float = 1.2
-) -> tuple[float, float]:
+    y_top_scale_factor: float = 1.25
+) -> tuple[tuple[float, float], tuple[float, float]]:
     if ax1_y_bounds is None:
         if y1 is None:
             raise ValueError("y1 must be provided if ax1_y_bounds is None")
@@ -674,11 +673,7 @@ def get_scaled_y_bounds(
     if ax2_y_bounds is None:
         if y2 is None:
             raise ValueError("y2 must be provided if ax2_y_bounds is None")
-        if align_maxes:
-            #TODO: implement
-            raise NotImplementedError("align_maxes is not implemented")
-        else:
-            y2_top = np.max(y2)*y_top_scale_factor
+        y2_top = np.max(y2)*y_top_scale_factor
         if fix_y2_top:
             y2_bottom = None
         else:
@@ -687,19 +682,16 @@ def get_scaled_y_bounds(
         ax2_y_bounds = (y2_bottom, y2_top)
 
     ax1_y_range = ax1_y_bounds[1] - ax1_y_bounds[0]
+    if ax1_y_range <= const.EPS:
+        raise ValueError("ax1_y_bounds range too small")
     y_val_frac = (y_val_line_up - ax1_y_bounds[0]) / ax1_y_range
     if ax2_y_bounds[0] is None:
         if ax2_y_bounds[1] is None:
             raise ValueError("Only one of ax2_y_bounds can be None")
         ax2_low = (y_val_line_up - y_val_frac * ax2_y_bounds[1]) / (1 - y_val_frac)
-        ax2_y_range = ax2_y_bounds[1] - ax2_low
-        print(f"ax1 range: {ax1_y_range}")
-        print(f"y_val_frac: {y_val_frac}")
-        print(f"ax2_low: {ax2_low}")
-        print(f"ax2 y val line up: {ax2_low + y_val_frac * ax2_y_range}")
-        return ax2_low, ax2_y_bounds[1]
+        return ax1_y_bounds, (ax2_low, ax2_y_bounds[1])
     elif ax2_y_bounds[1] is None:
         ax2_high = (y_val_line_up + ax2_y_bounds[0] * (y_val_frac - 1)) / y_val_frac
-        return ax2_y_bounds[0], ax2_high
+        return ax1_y_bounds, (ax2_y_bounds[0], ax2_high)
     else:
         raise ValueError("One of ax2_y_bounds must be None")

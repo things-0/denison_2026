@@ -1,7 +1,7 @@
 import numpy as np
 import warnings
 
-from .constants import *
+from . import constants as const
 from .helpers import convert_vel_to_lam, get_vel_lam_mask, get_masked_diffs
 from .gaussian_fitting import fit_gaussians
 
@@ -11,9 +11,9 @@ def integrate_flux(
     spec_flux_density_err: np.ndarray,
     lam_bounds: tuple[float, float],
     num_gaussians: int = 0,
-    vel_gaussian_fit_width: float = VEL_WIDTH_GAUSSIAN_FIT,
+    vel_gaussian_fit_width: float = const.VEL_WIDTH_GAUSSIAN_FIT,
     lam_centre: float | None = None,
-    n_mc_trials: int = NUM_MC_TRIALS,
+    n_mc_trials: int = const.NUM_MC_TRIALS,
     calculate_mean_fwhm: bool = False,
     # plot_gaussians: bool = True, #TODO: change back to False
     plot_gaussians: bool = False,
@@ -77,26 +77,26 @@ def calculate_balmer_decrement(
     lam: np.ndarray,
     sfd_diff: np.ndarray,
     sfd_diff_err: np.ndarray,
-    vel_integration_width: float = VEL_TO_IGNORE_WIDTH,
-    vel_gaussian_fit_width: float = VEL_WIDTH_GAUSSIAN_FIT,
-    vel_plot_width: float = VEL_PLOT_WIDTH,
-    num_gaussians: int = DEFAULT_NUM_GAUSSIANS,
-    n_mc_trials: int = NUM_MC_TRIALS,
+    vel_integration_width: float = const.VEL_TO_IGNORE_WIDTH,
+    vel_gaussian_fit_width: float = const.VEL_WIDTH_GAUSSIAN_FIT,
+    vel_plot_width: float = const.VEL_PLOT_WIDTH,
+    num_gaussians: int = const.DEFAULT_NUM_GAUSSIANS,
+    n_mc_trials: int = const.NUM_MC_TRIALS,
     num_bins: int = 1,
     plot_curves: bool = True, #TODO: create a new plotting function for this
     year: int | str = "",
 ) -> tuple[float, float]:
     bin_width = vel_integration_width / num_bins
 
-    gfw_alpha_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, H_ALPHA)
-    gfw_beta_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, H_BETA)
+    gfw_alpha_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, const.H_ALPHA)
+    gfw_beta_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, const.H_BETA)
 
     if num_gaussians > 0:
         gauss_sfd_diff_alpha_vals, gauss_sfd_diff_alpha_errs, _, _, _, _, _, _ = fit_gaussians(
             lam, sfd_diff, sfd_diff_err,
             num_gaussians=num_gaussians,
             mask_vel_width=vel_gaussian_fit_width,
-            mask_lam_centre=H_ALPHA,
+            mask_lam_centre=const.H_ALPHA,
             n_mc_trials=n_mc_trials,
             plot_fit=plot_curves,
             title=f"{year} Hα flux difference from 2001"
@@ -105,7 +105,7 @@ def calculate_balmer_decrement(
             lam, sfd_diff, sfd_diff_err,
             num_gaussians=num_gaussians,
             mask_vel_width=vel_gaussian_fit_width,
-            mask_lam_centre=H_BETA,
+            mask_lam_centre=const.H_BETA,
             n_mc_trials=n_mc_trials,
             plot_fit=plot_curves,
             title=f"{year} Hβ flux difference from 2001"
@@ -136,8 +136,8 @@ def calculate_balmer_decrement(
         vel_centre = vel_left + bin_width / 2
         vel_right = vel_left + bin_width
 
-        cur_lam_bounds_alpha = (convert_vel_to_lam(vel_left, H_ALPHA), convert_vel_to_lam(vel_right, H_ALPHA))
-        cur_lam_bounds_beta = (convert_vel_to_lam(vel_left, H_BETA), convert_vel_to_lam(vel_right, H_BETA))
+        cur_lam_bounds_alpha = (convert_vel_to_lam(vel_left, const.H_ALPHA), convert_vel_to_lam(vel_right, const.H_ALPHA))
+        cur_lam_bounds_beta = (convert_vel_to_lam(vel_left, const.H_BETA), convert_vel_to_lam(vel_right, const.H_BETA))
 
         h_alpha_flux, h_alpha_flux_err, _, _ = integrate_flux(x_alpha, y_alpha, y_alpha_err, cur_lam_bounds_alpha)
         h_beta_flux, h_beta_flux_err, _, _ = integrate_flux(x_beta, y_beta, y_beta_err, cur_lam_bounds_beta)
@@ -169,10 +169,10 @@ def get_bd_comparison_info(
     sfd_diff_err: np.ndarray,
     num_bins_bounds: tuple[int, int],
     num_gaussians_bounds: tuple[int, int],
-    vel_integration_width: float = VEL_TO_IGNORE_WIDTH,
-    vel_gaussian_fit_width: float = VEL_WIDTH_GAUSSIAN_FIT,
-    vel_plot_width: float = VEL_PLOT_WIDTH,
-    n_mc_trials: int = NUM_MC_TRIALS,
+    vel_integration_width: float = const.VEL_TO_IGNORE_WIDTH,
+    vel_gaussian_fit_width: float = const.VEL_WIDTH_GAUSSIAN_FIT,
+    vel_plot_width: float = const.VEL_PLOT_WIDTH,
+    n_mc_trials: int = const.NUM_MC_TRIALS,
     print_progress: bool = False,
 ) -> tuple[list[list[dict[str, np.ndarray]]], list[int], list[int]]:
     ...

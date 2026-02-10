@@ -1,17 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .constants import *
+from . import constants as const
 from .helpers import bin_data_by_median, get_lam_bounds
 from .plotting import plot_polynomial_ratio, plot_adjusted_spectrum
 from .data_reading import get_adjusted_data
 
 def get_polynom_fit(
-    lambdas: np.ndarray, vals: np.ndarray,
+    lambdas: np.ndarray,
+    vals: np.ndarray,
     year_to_adjust: int,
     baseline_year: int = 2015,
-    degree: float = 6, bin_width: float = 40,
-    bin_by_med: bool = True, plot_result: bool = True,
+    degree: float = 6,
+    bin_width: float = const.POLY_FIT_BIN_WIDTH,
+    bin_by_med: bool = True,
+    plot_result: bool = True,
 ) -> tuple[np.poly1d, np.ndarray]:
     if bin_by_med:
         binned_lambdas, binned_vals, binned_val_errs = bin_data_by_median(lambdas, vals, bin_width)
@@ -44,7 +47,8 @@ def get_polynom_fit(
             degree=degree,
             bin_width=bin_width,
             bin_by_med=bin_by_med,
-            title=title
+            title=title,
+            save_fig_name=f"sfd_ratio_{(year_to_adjust - 2000):02d}_to_{(baseline_year - 2000):02d}_med_binned"
         )
     return polynom, polynom_vals
 
@@ -52,10 +56,11 @@ def apply_poly_fit(
     data: tuple[np.ndarray, tuple[tuple[np.ndarray, np.ndarray]]] | None = None,
     year_to_adjust: int = 2022,
     baseline_year: int = 2015,
-    lambdas_to_ignore_width: float = VEL_TO_IGNORE_WIDTH,
+    lambdas_to_ignore_width: float = const.VEL_TO_IGNORE_WIDTH,
     width_is_vel: bool = True,
     poly_degree: float = 6,
-    bin_by_med: bool = True, bin_width: float = 50,
+    bin_by_med: bool = True,
+    bin_width: float = const.POLY_FIT_BIN_WIDTH,
     plot_ratio_selection: bool = True, 
     plot_poly_ratio: bool = True,
     plot_adjusted: bool = True,
@@ -93,8 +98,8 @@ def apply_poly_fit(
     balmer_mask = np.zeros(lam.shape, dtype=bool)
 
     lambdas_to_ignore = [
-        get_lam_bounds(H_ALPHA, lambdas_to_ignore_width, width_is_vel=width_is_vel),
-        get_lam_bounds(H_BETA, lambdas_to_ignore_width, width_is_vel=width_is_vel)
+        get_lam_bounds(const.H_ALPHA, lambdas_to_ignore_width, width_is_vel=width_is_vel),
+        get_lam_bounds(const.H_BETA, lambdas_to_ignore_width, width_is_vel=width_is_vel)
     ]
 
     for start, end in lambdas_to_ignore:
@@ -115,7 +120,8 @@ def apply_poly_fit(
             vals_removed=actual_ratio_flux_removed,
             bin_by_med=False,
             plot_selection=True,
-            title=ratio_title
+            title=ratio_title,
+            save_fig_name=f"sfd_ratio_{(year_to_adjust - 2000):02d}_to_{(baseline_year - 2000):02d}_selection"
         )
 
     polynom, _ = get_polynom_fit(
@@ -141,6 +147,7 @@ def apply_poly_fit(
             ions=ions,
             lam_bounds=adjusted_plot_lam_bounds,
             flux_y_bounds=adjusted_flux_y_bounds,
-            title=adjusted_plot_title
+            title=adjusted_plot_title,
+            save_fig_name=f"sfd_{(year_to_adjust - 2000):02d}_to_{(baseline_year - 2000):02d}_poly_fit"
         )
     return polynom, adjusted_flux, adjusted_err
