@@ -112,11 +112,11 @@ FNAME_2015_BLUE_4_ARCSEC = "323854_A_spectrum_4-arcsec_blue.fits"
 FNAME_2015_RED_4_ARCSEC = "323854_A_spectrum_4-arcsec_red.fits"
 
 VEL_LABEL = r"Velocity (km$\text{s}^{-1}$)"
-ANG_LABEL = r"Wavelength ($\AA$)"
+ANG_LABEL = r"Wavelength ($\mathrm{\AA}$)"
 SFD_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻² Å⁻¹"
 FLUX_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻²"
 FLUX_UNITS = r"$10^{-17}$ erg $\text{s}^{-1}$ $\text{cm}^{-2}$"
-SFD_UNITS = FLUX_UNITS + r" ${\AA}^{-1}$"
+SFD_UNITS = FLUX_UNITS + r" ${\mathrm{\AA}}^{-1}$"
 # SFD_Y_AX_LABEL = f"Spectral flux density ({SFD_UNITS})"
 SFD_Y_AX_LABEL = r"$F_{\lambda}$ " + f"({SFD_UNITS})"
 
