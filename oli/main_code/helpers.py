@@ -105,7 +105,8 @@ def convert_to_vel_data(
     flux: np.ndarray | None,
     flux_err: np.ndarray | None,
     centres_rest_ang: float | list[float],
-    vel_width: float | None
+    vel_width: float | None,
+    vel_units: str = "km/s"
 ) -> tuple[list[np.ndarray] | None, list[np.ndarray] | None, list[np.ndarray] | None]:
 
     if flux is None:
@@ -124,6 +125,10 @@ def convert_to_vel_data(
         
         trimmed_vel = vel[vel_width_mask]
         trimmed_flux = flux[vel_width_mask]
+        if vel_units == "Mm/s":
+            trimmed_vel *= 1e-3
+        elif vel_units != "km/s":
+            raise NotImplementedError("vel_units must be km/s or Mm/s")
         
         trimmed_vels.append(trimmed_vel)
         trimmed_fluxes.append(trimmed_flux)
@@ -131,6 +136,8 @@ def convert_to_vel_data(
         if flux_err is not None:
             trimmed_flux_err = flux_err[vel_width_mask]
             trimmed_flux_errs.append(trimmed_flux_err)
+    
+
         
     # check if all trimmed_vels are the same
     # if not all(np.all(trimmed_vel == trimmed_vels[0]) for trimmed_vel in trimmed_vels):

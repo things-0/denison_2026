@@ -102,11 +102,12 @@ SMOOTH_FACTOR = 1.0
 #
 
 # Plotting parameters
-PLOT_TITLES = False
-SAVE_FIGS = False
+PLOT_TITLES = True
+SAVE_FIGS = True
 FIG_OUTPUT_DIR = "output/"
 VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
-LINEWIDTH = 0.5
+LINEWIDTH = 1.5
+TEXT_SIZE = 14
 FIG_SIZE = (10,6)
 ERR_OPAC = 0.1
 FILL_BETWEEN_OPAC = 0.5
@@ -128,6 +129,7 @@ FNAME_2015_BLUE_4_ARCSEC = "323854_A_spectrum_4-arcsec_blue.fits"
 FNAME_2015_RED_4_ARCSEC = "323854_A_spectrum_4-arcsec_red.fits"
 
 VEL_LABEL = r"Velocity (km$\text{s}^{-1}$)"
+MMS_VEL_LABEL = r"Velocity ($10^3$ km$\text{s}^{-1}$)"
 BASE_ANG_LABEL = r"wavelength ($\mathrm{\AA}$)"
 ANG_LABEL = "Observed " + BASE_ANG_LABEL
 REST_ANG_LABEL = "Rest frame " + BASE_ANG_LABEL

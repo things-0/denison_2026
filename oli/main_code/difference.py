@@ -8,7 +8,8 @@ from .helpers import get_lam_bounds
 
 def get_diff_spectra(
     adjusted_fluxes: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
-    return_lam: bool = False
+    return_lam: bool = False,
+    arcsec: int = 3
 ) -> tuple[
     tuple[np.ndarray, np.ndarray, np.ndarray],
     tuple[np.ndarray, np.ndarray, np.ndarray]
@@ -18,7 +19,16 @@ def get_diff_spectra(
     np.ndarray
 ]:
     if adjusted_fluxes is None:
-        data = get_adjusted_data(plot_resampled_and_blurred=False)
+        if arcsec == 3:
+            data = get_adjusted_data(plot_resampled_and_blurred=False)
+        elif arcsec == 4:
+            data = get_adjusted_data(
+                plot_resampled_and_blurred=False,
+                fname_2015_blue=const.FNAME_2015_BLUE_4_ARCSEC,
+                fname_2015_red=const.FNAME_2015_RED_4_ARCSEC
+            )
+        else:
+            raise NotImplementedError("SAMI data must be 3 or 4 arc-seconds")
         lam = data[0]
         _, adjusted_01_flux_15, adjusted_01_err_15 = apply_poly_fit(
             data=data, year_to_adjust=2001, 
