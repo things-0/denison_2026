@@ -727,3 +727,7 @@ def get_scaled_y_bounds(
         return ax1_y_bounds, (ax2_y_bounds[0], ax2_high)
     else:
         raise ValueError("One of ax2_y_bounds must be None")
+
+
+def mpl_font_for_latex_9pt(fig_width_in, col_width_in=3.463, target_pt=9):
+    return target_pt * fig_width_in / col_width_in

@@ -264,9 +264,9 @@ def plot_adjusted_spectrum(
     save_fig_name: str | None = ""
 )-> None:
     plt.figure(figsize=const.FIG_SIZE)
-    plt.plot(lam, baseline_flux, color='black', label=f'{baseline_year}', lw = const.LINEWIDTH)
-    plt.plot(lam, unadjusted_flux, color='orange', label=f'{year_to_adjust}', lw = const.LINEWIDTH)
-    plt.plot(lam, adjusted_flux, color='red', label=f'{year_to_adjust} (polynomial fit to {baseline_year})', lw = const.LINEWIDTH)
+    plt.plot(lam, baseline_flux, color='black', label=f'{baseline_year}', lw = 0.7*const.LINEWIDTH)
+    plt.plot(lam, unadjusted_flux, color='orange', label=f'{year_to_adjust}', lw = 0.7*const.LINEWIDTH)
+    plt.plot(lam, adjusted_flux, color='red', label=f'{year_to_adjust} (polynomial fit to {baseline_year})', lw = 0.7*const.LINEWIDTH)
     plt.xlabel(const.ANG_LABEL)
     plt.ylabel(const.SFD_Y_AX_LABEL)
 
@@ -657,7 +657,7 @@ def plot_diff_spectra_one_fig(
     error_opacity: float = const.ERR_OPAC,
     colour_map: Colormap = const.COLOUR_MAP,
     n_ticks_x: int | None = None
-) -> tuple[str, str, str]:
+) -> tuple[str, str | None, str]:
 
     if isinstance(plot_centres, list) and plot_labels is not None and len(plot_centres) != len(plot_labels):
         raise ValueError("plot_centres and plot_labels must have the same length and correspond to each other")
@@ -748,7 +748,7 @@ def plot_diff_spectra_one_fig(
             flux = diffs_21[i]
             flux_err = diffs_21_err[i] if diffs_21_err is not None else None
             colour_21 = colour_map(3*i+1) if num_centres > 1 else 'red'
-            ax.plot(x_21[i], flux, alpha=0.7, color='red', label=f'{label_info} 2021 - 2001', lw = const.LINEWIDTH)
+            ax.plot(x_21[i], flux, alpha=0.7, color=colour_21, label=f'{label_info} 2021 - 2001', lw = const.LINEWIDTH)
             
             if flux_err is not None:
                 ax.fill_between(x_21[i], flux - flux_err, flux + flux_err, color=colour_21, alpha=error_opacity)
@@ -821,12 +821,15 @@ def plot_diff_spectra_one_fig(
     title = "" if len(all_years) != 1 else f"{all_years[0]} "
     title += "Spectral flux density difference from 2001"
     for i, ax in enumerate(axes):
-        y_axis_label = f"{plot_labels[i]}   {const.SFD_Y_AX_LABEL}" if scale_axes else const.SFD_Y_AX_LABEL
-        # ax.set_ylabel(y_axis_label)
+        if scale_axes:
+            y_axis_label = f"{plot_labels[i]}   {const.SFD_Y_AX_LABEL}"
+            ax.set_ylabel(y_axis_label)
+            y_axis_label = None
+        else:
+            y_axis_label = const.SFD_Y_AX_LABEL
         loc = "upper left" if i == 0 else "upper right"
         # loc = "best" if i == 0 else "upper right"
         ax.legend(loc=loc)
-
     return x_axis_label, y_axis_label, title
 
 def plot_diff_spectra_all(
@@ -981,8 +984,10 @@ def plot_diff_spectra_all(
         raise ValueError(f"conflicting titles: {titles}")
     if const.PLOT_TITLES:
         fig.suptitle(titles[0])
+    # print(f"y_axis_labels: {y_axis_labels}")
     fig.supxlabel(x_axis_labels[0])
-    fig.supylabel(y_axis_labels[0])
+    if y_axis_labels[0] is not None:
+        fig.supylabel(y_axis_labels[0])
     my_savefig(save_fig_name, fig=fig)
     fig.show()
 
