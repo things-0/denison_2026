@@ -146,7 +146,108 @@ def convert_to_vel_data(
     
     return trimmed_vels, trimmed_fluxes, trimmed_flux_errs
 
+
 def get_flux_bounds(
+    lams: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
+    fluxes: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
+    x_bounds: tuple[float, float] | None = None
+) -> tuple[float, float, float]:
+    min_flux_within_x_bounds = np.inf
+    max_flux_within_x_bounds = -np.inf
+    smallest_range_within_x_bounds = np.inf
+    largest_range_within_x_bounds = -np.inf
+    min_flux = np.inf
+    max_flux = -np.inf
+    smallest_range = np.inf
+    largest_range = -np.inf
+    
+    unpacked_fluxes = []
+    for flux in fluxes:
+        if isinstance(flux, tuple):
+            flux_blue, flux_red = flux
+            unpacked_fluxes.append(flux_blue)
+            unpacked_fluxes.append(flux_red)
+        else:
+            unpacked_fluxes.append(flux)
+    unpacked_lams = []
+    for lam in lams:
+        if isinstance(lam, tuple):
+            lam_blue, lam_red = lam
+            unpacked_lams.append(lam_blue)
+            unpacked_lams.append(lam_red)
+        else:
+            unpacked_lams.append(lam)
+
+    for lam, flux in zip(unpacked_lams, unpacked_fluxes):
+        if x_bounds is not None:
+            mask = np.where((lam > x_bounds[0]) & (lam < x_bounds[1]))
+        else:
+            mask = np.ones_like(lam, dtype=bool)
+        flux_within_x_bounds = flux[mask]
+
+        cur_min_flux_within_x_bounds = np.nanmin(flux_within_x_bounds)
+        cur_max_flux_within_x_bounds = np.nanmax(flux_within_x_bounds)
+        range_within_x_bounds = cur_max_flux_within_x_bounds - cur_min_flux_within_x_bounds
+
+        if cur_min_flux_within_x_bounds < min_flux_within_x_bounds:
+            min_flux_within_x_bounds = cur_min_flux_within_x_bounds
+        if cur_max_flux_within_x_bounds > max_flux_within_x_bounds:
+            max_flux_within_x_bounds = cur_max_flux_within_x_bounds
+        if range_within_x_bounds < smallest_range_within_x_bounds:
+            smallest_range_within_x_bounds = range_within_x_bounds
+        if range_within_x_bounds > largest_range_within_x_bounds:
+            largest_range_within_x_bounds = range_within_x_bounds
+            
+        cur_min_flux = np.nanmin(flux)
+        cur_max_flux = np.nanmax(flux)
+        range = cur_max_flux - cur_min_flux
+
+        if cur_min_flux < min_flux:
+            min_flux = cur_min_flux
+        if cur_max_flux > max_flux:
+            max_flux = cur_max_flux
+        if range < smallest_range:
+            smallest_range = range
+        if range > largest_range:
+            largest_range = range
+
+    total_range = max_flux - min_flux
+    total_range_within_x_bounds = max_flux_within_x_bounds - min_flux_within_x_bounds
+
+    return (
+        (min_flux, min_flux_within_x_bounds),
+        (smallest_range, smallest_range_within_x_bounds), 
+        (largest_range, largest_range_within_x_bounds),
+        (total_range, total_range_within_x_bounds)
+    )
+
+def get_better_y_bounds(
+    y_bounds: tuple[float, float] | None,
+    x_bounds: tuple[float, float] | None,
+    lams: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
+    fluxes: list[np.ndarray | tuple[np.ndarray, np.ndarray]]
+) -> tuple[float, float] | None:
+    if y_bounds is not None:
+        return y_bounds
+    (
+        (min_flux, min_flux_within_x_bounds),
+        (smallest_range, smallest_range_within_x_bounds),
+        (largest_range, largest_range_within_x_bounds),
+        (total_range, total_range_within_x_bounds)
+    ) = get_flux_bounds(
+        lams = lams,
+        fluxes = fluxes,
+        x_bounds = x_bounds
+    )
+    if total_range_within_x_bounds > 5 * smallest_range_within_x_bounds:
+        y_bounds = (min_flux_within_x_bounds / 1.2, min_flux_within_x_bounds + 1.2 * smallest_range_within_x_bounds)
+    elif total_range > 5 * smallest_range:
+        y_bounds = (min_flux_within_x_bounds / 1.2, min_flux_within_x_bounds + 1.2 * largest_range_within_x_bounds)
+    else:
+        return None
+    return y_bounds
+
+def get_flux_bounds_old(
     lam01: np.ndarray,
     lam15: np.ndarray | tuple[np.ndarray, np.ndarray],
     lam21: np.ndarray,

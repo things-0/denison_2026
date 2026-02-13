@@ -271,8 +271,9 @@ def get_mc_errs_perturb_y(
             ith_fitted_y = calculate_n_gaussians_func(x, *best_fit_params)
             fitted_y_samples.append(ith_fitted_y)
         except RuntimeError:
-            #TD: remove testing
-            print(f"Failed to fit Gaussian model on trial {i + 1}")
+            if print_warnings:
+                warn_msg = f"Failed to fit Gaussian model on trial {i + 1}"
+                warnings.warn(warn_msg)
             #
             continue  # Skip failed fits
         

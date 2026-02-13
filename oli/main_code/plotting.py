@@ -65,7 +65,7 @@ def plot_vert_emission_lines(
             x_val = convert_lam_to_vel(obs_lam, lam_centre_rest_frame=vel_centre_ang)
         if plot_x_bounds is None or (plot_x_bounds[0] < obs_lam < plot_x_bounds[1]):
             ax.axvline(
-                x_val, linestyle='--', lw=const.LINEWIDTH,
+                x_val, linestyle='--', lw=0.5*const.LINEWIDTH,
                 color=vlines_cmap(i), label=name
             )
 
@@ -148,9 +148,15 @@ def plot_spectra(
     fill_between_bounds: tuple[float, float] | None = None,
     fill_between_label: str | None = None,
     fill_between_opacity: float = 0.5,
+    y_offset: float = 0.0,
     legend_loc: str | None = "best",
     save_fig_name: str | None = ""
 ) -> None:
+    
+    flux01 += y_offset
+    flux21 += y_offset
+    flux22 += y_offset
+
     sami_is_split = True if isinstance(flux15, tuple) else False
 
     plt.figure(figsize=const.FIG_SIZE)
@@ -160,9 +166,13 @@ def plot_spectra(
         flux15_blue, flux15_red = flux15
         lam15_blue, lam15_red = lam15
 
+        flux15_blue, flux15_red = flux15_blue + y_offset, flux15_red + y_offset
+
         plt.plot(lam15_blue, flux15_blue, color='blue', label='2015 blue arm (SAMI)', lw = const.LINEWIDTH)
         plt.plot(lam15_red, flux15_red, color='red', label='2015 red arm (SAMI)', lw = const.LINEWIDTH)
     else:
+        flux15 += y_offset
+
         plt.plot(lam15, flux15, color='purple', label='2015 (SAMI)', lw = const.LINEWIDTH)
 
     plt.plot(lam21, flux21, color='orange', label='2021 (SDSS)', lw = const.LINEWIDTH)
@@ -189,17 +199,16 @@ def plot_spectra(
         fill_between_label=fill_between_label,
         fill_between_opacity=fill_between_opacity
     )
-    
-    if y_bounds is not None:
-        plt.ylim(y_bounds)
-    else:
-        min_flux, smallest_range, total_range = get_flux_bounds(
-            lam01, lam15, lam21, lam22,
-            flux01, flux15, flux21, flux22,
-            x_bounds
-        )
-        if total_range > 5 * smallest_range:
-            plt.ylim((min_flux / 1.2, min_flux + 1.2 * smallest_range))
+
+    better_y_bounds = get_better_y_bounds(
+        y_bounds = y_bounds,
+        x_bounds = x_bounds,
+        lams = [lam01, lam15, lam21, lam22],
+        fluxes = [flux01, flux15, flux21, flux22]
+    )
+
+    if better_y_bounds is not None:
+        plt.ylim(better_y_bounds)
 
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
@@ -273,13 +282,16 @@ def plot_adjusted_spectrum(
     plot_vert_emission_lines(ions, lam_bounds)
     if const.PLOT_TITLES:
         plt.title(title)
-    if flux_y_bounds is not None:
-        plt.ylim(flux_y_bounds)
-    elif ((
-        np.nanmax(adjusted_flux) - np.nanmin(adjusted_flux)) >
-        10 * (np.nanmax(unadjusted_flux) - np.nanmin(unadjusted_flux)
-    )):
-        plt.ylim((0, 1.2 * np.nanmax(unadjusted_flux)))
+
+    better_y_bounds = get_better_y_bounds(
+        y_bounds = flux_y_bounds,
+        x_bounds = lam_bounds,
+        lams = [lam, lam, lam],
+        fluxes = [baseline_flux, unadjusted_flux, adjusted_flux]
+    )
+    if better_y_bounds is not None:
+        plt.ylim(better_y_bounds)
+
     plt.legend()
     my_savefig(save_fig_name)
     plt.show()
