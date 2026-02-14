@@ -64,7 +64,7 @@ def plot_vert_emission_lines(
             x_val = convert_lam_to_vel(obs_lam, lam_centre_rest_frame=vel_centre_ang)
         if plot_x_bounds is None or (plot_x_bounds[0] < obs_lam < plot_x_bounds[1]):
             ax.axvline(
-                x_val, linestyle='--', lw=0.5*const.LINEWIDTH,
+                x_val, linestyle='--', lw=0.7*const.LINEWIDTH,
                 color=vlines_cmap(i), label=name
             )
 
@@ -905,7 +905,7 @@ def plot_gaussians(
         plt.text(
             0.05, 0.95, label,
             transform=plt.gca().transAxes,
-            fontsize=12, verticalalignment='top'
+            fontsize=const.TEXT_SIZE, verticalalignment='top'
         )
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)

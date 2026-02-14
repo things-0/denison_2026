@@ -103,15 +103,15 @@ SMOOTH_FACTOR = 1.0
 
 # Plotting parameters
 LATEX_SINGLE_TO_DOUBLE_COL_WIDTH_RATIO = 2.05712
-PLOT_TITLES = True
-SAVE_FIGS = False
+PLOT_TITLES = False
+SAVE_FIGS = True
 FIG_OUTPUT_DIR = "output/"
 VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
 LINEWIDTH = 1.5
 FIG_SIZE = (10,6)
 DOUBLE_FIG_SIZE = (18,6)
 TALL_FIG_SIZE = (10, 8)
-TEXT_SCALE_FACTOR = 1.45
+TEXT_SCALE_FACTOR = 1.8
 TEXT_SIZE = FIG_SIZE[0] * TEXT_SCALE_FACTOR
 DOUBLE_TEXT_SIZE = DOUBLE_FIG_SIZE[0] * TEXT_SCALE_FACTOR / LATEX_SINGLE_TO_DOUBLE_COL_WIDTH_RATIO
 ERR_OPAC = 0.1
@@ -145,6 +145,8 @@ FLUX_UNITS = r"$10^{-17}$ erg $\text{s}^{-1}$ $\text{cm}^{-2}$"
 SFD_UNITS = FLUX_UNITS + r" ${\mathrm{\AA}}^{-1}$"
 # SFD_Y_AX_LABEL = f"Spectral flux density ({SFD_UNITS})"
 SFD_Y_AX_LABEL = r"$F_{\lambda}$ " + f"({SFD_UNITS})"
+HA_LATEX = r"H$\alpha$"
+HB_LATEX = r"H$\beta$"
 
 # From 2021 "The SAMI Galaxy Survey: the third and final data release"
 """

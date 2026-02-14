@@ -6,6 +6,9 @@ from sqlalchemy.util.langhelpers import bool_or_str
 
 from . import constants as const
 
+def get_first_valid_flux(flux: np.ndarray):
+    return flux[np.where(np.isfinite(flux))[0][0]]
+
 def convert_lam_to_vel(
     lam: np.ndarray | float,
     lam_centre_rest_frame: float = const.H_ALPHA,
