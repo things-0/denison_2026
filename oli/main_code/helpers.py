@@ -2,6 +2,8 @@ import numpy as np
 import os
 import ast
 
+from sqlalchemy.util.langhelpers import bool_or_str
+
 from . import constants as const
 
 def convert_lam_to_vel(
@@ -146,192 +148,108 @@ def convert_to_vel_data(
     
     return trimmed_vels, trimmed_fluxes, trimmed_flux_errs
 
+def get_radius_from_med(lam: np.ndarray, flux: np.ndarray) -> float:
+    _, flux_binned, _ = bin_data_by_median(lam, flux, 20)
+    return np.nanmedian(np.abs(np.diff(flux_binned))) * 100
 
-def get_flux_bounds(
-    lams: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
-    fluxes: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
-    x_bounds: tuple[float, float] | None = None
-) -> tuple[float, float, float]:
-    min_flux_within_x_bounds = np.inf
-    max_flux_within_x_bounds = -np.inf
-    smallest_range_within_x_bounds = np.inf
-    largest_range_within_x_bounds = -np.inf
-    min_flux = np.inf
-    max_flux = -np.inf
-    smallest_range = np.inf
-    largest_range = -np.inf
-    
-    unpacked_fluxes = []
-    for flux in fluxes:
-        if isinstance(flux, tuple):
-            flux_blue, flux_red = flux
-            unpacked_fluxes.append(flux_blue)
-            unpacked_fluxes.append(flux_red)
-        else:
-            unpacked_fluxes.append(flux)
-    unpacked_lams = []
-    for lam in lams:
-        if isinstance(lam, tuple):
-            lam_blue, lam_red = lam
-            unpacked_lams.append(lam_blue)
-            unpacked_lams.append(lam_red)
-        else:
-            unpacked_lams.append(lam)
+def update_min_med_max_fluxes(
+    flux: np.ndarray,
+    median_fluxes: list[float],
+    min_flux: float,
+    max_flux: float,
+    reasonable_min_flux: float,
+    reasonable_max_flux: float,
+    suggested_lower_bounds: list[tuple[float, float]],
+    suggested_upper_bounds: list[tuple[float, float]],
+    radius_from_med: int
+) -> tuple[float, float, float, float]:
+    new_max = np.max((max_flux, np.nanmax(flux)))
+    new_min = np.min((min_flux, np.nanmin(flux)))
+    med = np.nanmedian(flux)
+    median_fluxes.append(med)
+    suggested_lower_bounds.append(med - radius_from_med)
+    suggested_upper_bounds.append(med + radius_from_med)    
+    if np.nanmin(flux) >= med - radius_from_med:
+        new_reasonable_min_flux = np.min((reasonable_min_flux, np.nanmin(flux)))
+    else:
+        new_reasonable_min_flux = reasonable_min_flux
+    if np.nanmax(flux) <= med + radius_from_med:
+        new_reasonable_max_flux = np.max((reasonable_max_flux, np.nanmax(flux)))
+    else:
+        new_reasonable_max_flux = reasonable_max_flux
+    suggested_lower_bounds.append(med - radius_from_med)
+    suggested_upper_bounds.append(med + radius_from_med)
+    return new_min, new_max, new_reasonable_min_flux, new_reasonable_max_flux
 
-    for lam, flux in zip(unpacked_lams, unpacked_fluxes):
-        if x_bounds is not None:
-            mask = np.where((lam > x_bounds[0]) & (lam < x_bounds[1]))
-        else:
-            mask = np.ones_like(lam, dtype=bool)
-        flux_within_x_bounds = flux[mask]
-
-        cur_min_flux_within_x_bounds = np.nanmin(flux_within_x_bounds)
-        cur_max_flux_within_x_bounds = np.nanmax(flux_within_x_bounds)
-        range_within_x_bounds = cur_max_flux_within_x_bounds - cur_min_flux_within_x_bounds
-
-        if cur_min_flux_within_x_bounds < min_flux_within_x_bounds:
-            min_flux_within_x_bounds = cur_min_flux_within_x_bounds
-        if cur_max_flux_within_x_bounds > max_flux_within_x_bounds:
-            max_flux_within_x_bounds = cur_max_flux_within_x_bounds
-        if range_within_x_bounds < smallest_range_within_x_bounds:
-            smallest_range_within_x_bounds = range_within_x_bounds
-        if range_within_x_bounds > largest_range_within_x_bounds:
-            largest_range_within_x_bounds = range_within_x_bounds
-            
-        cur_min_flux = np.nanmin(flux)
-        cur_max_flux = np.nanmax(flux)
-        range = cur_max_flux - cur_min_flux
-
-        if cur_min_flux < min_flux:
-            min_flux = cur_min_flux
-        if cur_max_flux > max_flux:
-            max_flux = cur_max_flux
-        if range < smallest_range:
-            smallest_range = range
-        if range > largest_range:
-            largest_range = range
-
-    total_range = max_flux - min_flux
-    total_range_within_x_bounds = max_flux_within_x_bounds - min_flux_within_x_bounds
-
-    return (
-        (min_flux, min_flux_within_x_bounds),
-        (smallest_range, smallest_range_within_x_bounds), 
-        (largest_range, largest_range_within_x_bounds),
-        (total_range, total_range_within_x_bounds)
-    )
 
 def get_better_y_bounds(
     y_bounds: tuple[float, float] | None,
-    x_bounds: tuple[float, float] | None,
     lams: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
-    fluxes: list[np.ndarray | tuple[np.ndarray, np.ndarray]]
-) -> tuple[float, float] | None:
+    fluxes: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
+    calculate_radius_from_med: bool = True,
+    radius_from_med: int = 40
+) -> tuple[float | None, float | None]:
     if y_bounds is not None:
         return y_bounds
-    (
-        (min_flux, min_flux_within_x_bounds),
-        (smallest_range, smallest_range_within_x_bounds),
-        (largest_range, largest_range_within_x_bounds),
-        (total_range, total_range_within_x_bounds)
-    ) = get_flux_bounds(
-        lams = lams,
-        fluxes = fluxes,
-        x_bounds = x_bounds
-    )
-    if total_range_within_x_bounds > 5 * smallest_range_within_x_bounds:
-        y_bounds = (min_flux_within_x_bounds / 1.2, min_flux_within_x_bounds + 1.2 * smallest_range_within_x_bounds)
-    elif total_range > 5 * smallest_range:
-        y_bounds = (min_flux_within_x_bounds / 1.2, min_flux_within_x_bounds + 1.2 * largest_range_within_x_bounds)
-    else:
-        return None
-    return y_bounds
 
-def get_flux_bounds_old(
-    lam01: np.ndarray,
-    lam15: np.ndarray | tuple[np.ndarray, np.ndarray],
-    lam21: np.ndarray,
-    lam22: np.ndarray,
-    flux01: np.ndarray,
-    flux15: np.ndarray | tuple[np.ndarray, np.ndarray],
-    flux21: np.ndarray,
-    flux22: np.ndarray,
-    x_bounds: tuple[float, float] | None
-) -> tuple[float, float, float]:
-    sami_is_split = True if isinstance(flux15, tuple) else False
-    if x_bounds is not None:
-        lam_01_plot_mask = np.where(np.isfinite(flux01) & (lam01 > x_bounds[0]) & (lam01 < x_bounds[1]))
-        lam_21_plot_mask = np.where(np.isfinite(flux21) & (lam21 > x_bounds[0]) & (lam21 < x_bounds[1]))
-        lam_22_plot_mask = np.where(np.isfinite(flux22) & (lam22 > x_bounds[0]) & (lam22 < x_bounds[1]))
-    else:
-        lam_01_plot_mask = np.isfinite(flux01)
-        lam_21_plot_mask = np.isfinite(flux21)
-        lam_22_plot_mask = np.isfinite(flux22)
+    y_lower = None
+    y_upper = None
 
-    if sami_is_split:
-        flux15_blue, flux15_red = flux15
-        lam15_blue, lam15_red = lam15
+    median_fluxes = []
+    max_flux = -np.inf
+    min_flux = np.inf
+    reasonable_max_flux = -np.inf
+    reasonable_min_flux = np.inf
+    suggested_lower_bounds = []
+    suggested_upper_bounds = []
+    for lam, flux in zip(lams, fluxes):
+        if isinstance(flux, tuple):
+            flux_blue, flux_red = flux
+            lam_blue, lam_red = lam
 
-        if x_bounds is not None:
-            lam_15_blue_plot_mask = np.where(np.isfinite(flux15_blue) & (lam15_blue > x_bounds[0]) & (lam15_blue < x_bounds[1]))
-            lam_15_red_plot_mask = np.where(np.isfinite(flux15_red) & (lam15_red > x_bounds[0]) & (lam15_red < x_bounds[1]))
-        else:
-            lam_15_blue_plot_mask = np.isfinite(flux15_blue)
-            lam_15_red_plot_mask = np.isfinite(flux15_red)
+            if calculate_radius_from_med:
+                radius_blue = get_radius_from_med(lam_blue, flux_blue)
+                radius_red = get_radius_from_med(lam_red, flux_red)
+            else:
+                radius_blue = radius_from_med
+                radius_red = radius_from_med
 
-        max_flux_15 = np.nanmax((
-            np.nanmax(flux15_blue[lam_15_blue_plot_mask], initial=np.nan),
-            np.nanmax(flux15_red[lam_15_red_plot_mask], initial=np.nan)
-        ))
-        min_flux_15 = np.nanmin((
-            np.nanmin(flux15_blue[lam_15_blue_plot_mask], initial=np.nan),
-            np.nanmin(flux15_red[lam_15_red_plot_mask], initial=np.nan)
-        ))
-        smallest_range_15 = np.nanmin((
-            (
-                np.nanmax(flux15_blue[lam_15_blue_plot_mask], initial=np.nan) -
-                np.nanmin(flux15_blue[lam_15_blue_plot_mask], initial=np.nan)
-            ), (
-                np.nanmax(flux15_red[lam_15_red_plot_mask], initial=np.nan) -
-                np.nanmin(flux15_red[lam_15_red_plot_mask], initial=np.nan)
+            min_flux, max_flux, reasonable_min_flux, reasonable_max_flux = update_min_med_max_fluxes(
+                flux_blue, median_fluxes, min_flux, max_flux,
+                reasonable_min_flux, reasonable_max_flux,
+                suggested_lower_bounds, suggested_upper_bounds,
+                radius_blue
             )
-        ))
-    else:
-        lam_15_plot_mask = np.isfinite(flux15)
+            min_flux, max_flux, reasonable_min_flux, reasonable_max_flux = update_min_med_max_fluxes(
+                flux_red, median_fluxes, min_flux, max_flux,
+                reasonable_min_flux, reasonable_max_flux,
+                suggested_lower_bounds, suggested_upper_bounds,
+                radius_red
+            )
 
-        max_flux_15 = np.nanmax(flux15[lam_15_plot_mask], initial=np.nan)
-        min_flux_15 = np.nanmin(flux15[lam_15_plot_mask], initial=np.nan)
-        smallest_range_15 = (
-            np.nanmax(flux15[lam_15_plot_mask], initial=np.nan) -
-            np.nanmin(flux15[lam_15_plot_mask], initial=np.nan)
-        )
-
-    max_flux = np.nanmax((
-        np.nanmax(flux01[lam_01_plot_mask], initial=np.nan),
-        max_flux_15,
-        np.nanmax(flux21[lam_21_plot_mask], initial=np.nan),
-        np.nanmax(flux22[lam_22_plot_mask], initial=np.nan)
-    ))
-    min_flux = np.nanmin((
-        np.nanmin(flux01[lam_01_plot_mask]),
-        min_flux_15,
-        np.nanmin(flux21[lam_21_plot_mask]),
-        np.nanmin(flux22[lam_22_plot_mask])
-    ))
-    total_range = max_flux - min_flux
-    smallest_range = np.nanmin((
-        (
-            np.nanmax(flux01[lam_01_plot_mask], initial=np.nan) -
-            np.nanmin(flux01[lam_01_plot_mask], initial=np.nan)
-        ), smallest_range_15, (
-            np.nanmax(flux21[lam_21_plot_mask], initial=np.nan) -
-            np.nanmin(flux21[lam_21_plot_mask], initial=np.nan)
-        ), (
-            np.nanmax(flux22[lam_22_plot_mask], initial=np.nan) -
-            np.nanmin(flux22[lam_22_plot_mask], initial=np.nan)
-        )
-    ))
-    return min_flux, smallest_range, total_range
+        else:
+            if calculate_radius_from_med:
+                radius = get_radius_from_med(lam, flux)
+            else:
+                radius = radius_from_med
+            min_flux, max_flux, reasonable_min_flux, reasonable_max_flux = update_min_med_max_fluxes(
+                flux, median_fluxes, min_flux, max_flux,
+                reasonable_min_flux, reasonable_max_flux,
+                suggested_lower_bounds, suggested_upper_bounds,
+                radius
+            )
+    
+    if max_flux > np.max(suggested_upper_bounds):
+        if np.isfinite(reasonable_max_flux):
+            y_upper = reasonable_max_flux * 1.07
+        else:
+            y_upper = np.max(suggested_upper_bounds)
+    if min_flux < np.min(suggested_lower_bounds):
+        if np.isfinite(reasonable_min_flux) and np.isfinite(reasonable_max_flux):
+            y_lower = reasonable_min_flux - 0.07 * reasonable_max_flux
+        else:
+            y_lower = np.min(suggested_lower_bounds)
+    return y_lower, y_upper
 
 def convert_flux_to_mJy(
     flux: float,

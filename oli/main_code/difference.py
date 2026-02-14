@@ -30,22 +30,26 @@ def get_diff_spectra(
         else:
             raise NotImplementedError("SAMI data must be 3 or 4 arc-seconds")
         lam = data[0]
-        _, adjusted_01_flux_15, adjusted_01_err_15 = apply_poly_fit(
+        _, adjusted_01_flux_15, adjusted_01_err_15, last_valid_lam_idx_01 = apply_poly_fit(
             data=data, year_to_adjust=2001, 
             plot_ratio_selection=False, plot_poly_ratio=False, plot_adjusted=False,
         )
-        _, adjusted_15_flux_15, adjusted_15_err_15 = apply_poly_fit(
+        _, adjusted_15_flux_15, adjusted_15_err_15, last_valid_lam_idx_15 = apply_poly_fit(
             data=data, year_to_adjust=2015,
             plot_ratio_selection=False, plot_poly_ratio=False, plot_adjusted=False,
         )
-        _, adjusted_21_flux_15, adjusted_21_err_15 = apply_poly_fit(
+        _, adjusted_21_flux_15, adjusted_21_err_15, last_valid_lam_idx_21 = apply_poly_fit(
             data=data, year_to_adjust=2021,
             plot_ratio_selection=False, plot_poly_ratio=False, plot_adjusted=False,
         )
-        _, adjusted_22_flux_15, adjusted_22_err_15 = apply_poly_fit(
+        _, adjusted_22_flux_15, adjusted_22_err_15, last_valid_lam_idx_22 = apply_poly_fit(
             data=data, year_to_adjust=2022,
             plot_ratio_selection=False, plot_poly_ratio=False, plot_adjusted=False,
         )
+        lam_adjusted = lam[:int(np.nanmin((
+            last_valid_lam_idx_01, last_valid_lam_idx_15,
+            last_valid_lam_idx_21, last_valid_lam_idx_22
+        )))]
     else:
         (
             (adjusted_01_flux_15, adjusted_01_err_15),
@@ -53,7 +57,7 @@ def get_diff_spectra(
             (adjusted_21_flux_15, adjusted_21_err_15),
             (adjusted_22_flux_15, adjusted_22_err_15)
         ) = adjusted_fluxes
-        lam = None
+        lam_adjusted = None
     
     diff_15 = adjusted_15_flux_15 - adjusted_01_flux_15
     diff_21 = adjusted_21_flux_15 - adjusted_01_flux_15
@@ -63,9 +67,9 @@ def get_diff_spectra(
     diff_21_err = np.sqrt(adjusted_01_err_15**2 + adjusted_21_err_15**2)
     diff_22_err = np.sqrt(adjusted_01_err_15**2 + adjusted_22_err_15**2)
 
-    if return_lam and lam is not None:
-        to_return = (diff_15, diff_21, diff_22), (diff_15_err, diff_21_err, diff_22_err), lam
-    elif return_lam and lam is None:
+    if return_lam and lam_adjusted is not None:
+        to_return = (diff_15, diff_21, diff_22), (diff_15_err, diff_21_err, diff_22_err), lam_adjusted
+    elif return_lam and lam_adjusted is None:
         raise ValueError(
             "lam can only be returned if adjusted_fluxes "
             "are calculated within this function."

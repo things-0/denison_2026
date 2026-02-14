@@ -64,11 +64,12 @@ def apply_poly_fit(
     plot_ratio_selection: bool = True, 
     plot_poly_ratio: bool = True,
     plot_adjusted: bool = True,
-    adjusted_plot_lam_bounds: tuple[float] | None = (3800, 8000),
+    adjusted_plot_lam_bounds: tuple[float] | None = None, # const.TOTAL_LAM_BOUNDS, # (3800, 8000),
     adjusted_flux_y_bounds: tuple[float] | None = None,
     # adjusted_err_y_bounds: tuple[float] | None = None, #TD: remove?
     ions: dict[str, float] | None = None,
     blur_before_resampling: bool = True,
+    extrapolate_beyond_max_baseline_lam: bool = False,
 ) -> tuple[np.poly1d | None, np.ndarray, np.ndarray]:
     possible_years = [2001, 2015, 2021, 2022]
     if year_to_adjust not in possible_years or baseline_year not in possible_years:
@@ -92,7 +93,12 @@ def apply_poly_fit(
     baseline_flux, baseline_err = data_map.get(baseline_year)
 
     if year_to_adjust == baseline_year:
-        return None, flux, err
+        if extrapolate_beyond_max_baseline_lam:
+            return None, flux, err, np.nan
+        last_valid_lam_idx = int(np.where(np.isfinite(flux))[0][-1])
+        adjusted_flux = flux[:last_valid_lam_idx]
+        adjusted_err = err[:last_valid_lam_idx]
+        return None, adjusted_flux, adjusted_err, last_valid_lam_idx
 
     actual_ratio_flux = flux / baseline_flux
     balmer_mask = np.zeros(lam.shape, dtype=bool)
@@ -135,10 +141,20 @@ def apply_poly_fit(
     adjusted_flux = flux / polynom(lam)
     adjusted_err = err / polynom(lam)
 
+    if not extrapolate_beyond_max_baseline_lam:
+        last_valid_lam_idx = int(np.where(np.isfinite(actual_ratio_flux))[0][-1])
+        adjusted_flux = adjusted_flux[:last_valid_lam_idx]
+        adjusted_err = adjusted_err[:last_valid_lam_idx]
+        adjusted_lam = lam[:last_valid_lam_idx]
+    else:
+        adjusted_lam = lam
+        last_valid_lam_idx = np.nan
+
     if plot_adjusted:
         adjusted_plot_title = f"Spectral flux density of {year_to_adjust} (polynomial fit to {baseline_year})"
         plot_adjusted_spectrum(
             lam=lam,
+            adjusted_lam=adjusted_lam,
             baseline_flux=baseline_flux,
             unadjusted_flux=flux,
             adjusted_flux=adjusted_flux,
@@ -150,4 +166,4 @@ def apply_poly_fit(
             title=adjusted_plot_title,
             save_fig_name=f"sfd_{(year_to_adjust - 2000):02d}_to_{(baseline_year - 2000):02d}_poly_fit"
         )
-    return polynom, adjusted_flux, adjusted_err
+    return polynom, adjusted_flux, adjusted_err, last_valid_lam_idx
