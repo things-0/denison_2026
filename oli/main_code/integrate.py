@@ -8,8 +8,8 @@ from .gaussian_fitting import fit_gaussians
 def integrate_flux(
     lam: np.ndarray,
     spec_flux_density: np.ndarray,
-    spec_flux_density_err: np.ndarray,
-    lam_bounds: tuple[float, float],
+    spec_flux_density_err: np.ndarray | None = None, # None doesn't work for num_gaussians > 0
+    lam_bounds: tuple[float, float] | None = None, # None doesn't work for num_gaussians > 0
     num_gaussians: int = 0,
     vel_gaussian_fit_width: float = const.VEL_WIDTH_GAUSSIAN_FIT,
     lam_centre: float | None = None,
@@ -52,13 +52,18 @@ def integrate_flux(
     else:
         if spec_flux_density.shape != lam.shape:
             raise ValueError("spec_flux_density and lam must have the same shape")
-        if spec_flux_density_err.shape != lam.shape:
-            raise ValueError("spec_flux_density_err and lam must have the same shape")
+        if spec_flux_density_err is not None:
+            if spec_flux_density_err.shape != lam.shape:
+                raise ValueError("spec_flux_density_err and lam must have the same shape")
+            sfd_err_trimmed = spec_flux_density_err[integrate_width_mask]
+        else:
+            sfd_err_trimmed = None
 
-        integrate_width_mask = np.where((lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(lam)))
+        integrate_width_mask = np.where(
+            (lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(spec_flux_density))
+        ) if lam_bounds is not None else np.where(np.isfinite(spec_flux_density))
         lam_trimmed = lam[integrate_width_mask]
         sfd_trimmed = spec_flux_density[integrate_width_mask]
-        sfd_err_trimmed = spec_flux_density_err[integrate_width_mask]
         fwhm_mean = None
         fwhm_err = None
     
@@ -66,7 +71,7 @@ def integrate_flux(
 
     flux = np.trapezoid(sfd_trimmed, x=lam_trimmed)
     err_weights = get_masked_diffs(lam_trimmed, mask=None)
-    flux_err = np.sqrt(np.sum((err_weights * sfd_err_trimmed)**2))
+    flux_err = np.sqrt(np.sum((err_weights * sfd_err_trimmed)**2)) if sfd_err_trimmed is not None else None
 
     return flux, flux_err, fwhm_mean, fwhm_err
 

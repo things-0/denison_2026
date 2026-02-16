@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-Z_SPEC = 0.0582 # for spectroscopy
+Z_SPEC = 0.0581892766058445 # for spectroscopy (was 0.0582)
 Z_LUM = 0.05938
 
 # From SAMI header
@@ -104,7 +104,7 @@ SMOOTH_FACTOR = 1.0
 # Plotting parameters
 LATEX_SINGLE_TO_DOUBLE_COL_WIDTH_RATIO = 2.05712
 PLOT_TITLES = False
-SAVE_FIGS = True
+SAVE_FIGS = False
 FIG_OUTPUT_DIR = "output/"
 VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
 LINEWIDTH = 1.5
@@ -117,9 +117,12 @@ DOUBLE_TEXT_SIZE = DOUBLE_FIG_SIZE[0] * TEXT_SCALE_FACTOR / LATEX_SINGLE_TO_DOUB
 ERR_OPAC = 0.1
 FILL_BETWEEN_OPAC = 0.5
 COLOUR_MAP = plt.cm.tab10
+ALT_COLOUR_MAP = plt.cm.tab20
 FIG_LAYOUT = "constrained"
 
 VEL_WIDTH_GAUSSIAN_FIT = VEL_PLOT_WIDTH
+
+PPXF_FOLDER_NAME = "data/ppxf_results/"
 
 SDSS_FOLDER_NAME = "data/sami323854/sdss_data/"
 SAMI_FOLDER_NAME = "data/sami323854/sami_data/"

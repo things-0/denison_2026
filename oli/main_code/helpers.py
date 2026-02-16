@@ -6,6 +6,9 @@ from sqlalchemy.util.langhelpers import bool_or_str
 
 from . import constants as const
 
+def custom_showwarning(msg, category, filename, lineno, *args, **kwargs):
+    print(f"WARNING ({filename}:{lineno}): {msg}", flush=True)
+
 def get_first_valid_flux(flux: np.ndarray):
     return flux[np.where(np.isfinite(flux))[0][0]]
 
@@ -300,12 +303,13 @@ def convert_flux_to_mJy(
 def get_vel_lam_mask(
     lam: np.ndarray,
     vel_width: float,
-    vel_centre_ang: float
+    vel_centre_ang: float,
+    lam_is_rest_frame: bool = False
 ) -> np.ndarray:
     """
     Get a mask for the wavelength array based on the velocity width and centre wavelength.
     """
-    vel = convert_lam_to_vel(lam, lam_centre_rest_frame=vel_centre_ang)
+    vel = convert_lam_to_vel(lam, lam_centre_rest_frame=vel_centre_ang, lam_is_rest_frame=lam_is_rest_frame)
     vel_width_mask = (vel >= -vel_width / 2) & (vel <= vel_width / 2)
     return vel_width_mask
 
