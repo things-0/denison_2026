@@ -1,13 +1,231 @@
 import numpy as np
-import astropy.io.fits as fits
-from PyAstronomy import pyasl
 import spectres
+
+import astropy.io.fits as fits
+import ppxf.ppxf_util as util
+from PyAstronomy import pyasl
+
+from pathlib import Path
 import warnings
 
-from .adjust_calibration import gaussian_blur_before_resampling, gaussian_blur_after_resampling, clip_sami_blue_edge
 from . import constants as const
-from .helpers import get_min_res
+from .adjust_calibration import gaussian_blur_before_resampling, gaussian_blur_after_resampling, clip_sami_blue_edge
+from .helpers import get_min_res, remove_or_replace_bad_values
 from .plotting import plot_min_res, plot_spectra, plot_vert_emission_lines
+
+def get_sami_data(
+    file_name: str,
+    folder_path: Path = const.SAMI_DATA_DIR,
+    flux_power_of_10: int = 17,
+    lam_medium: tuple[str, str] = ("air", "vacuum"),
+    lam_bounds: tuple[float, float] | None = const.TOTAL_LAM_BOUNDS,
+    rm_or_replace_outside_lam_bounds: bool | float = True,
+    rm_or_replace_other_bad_values: bool | float = np.nan,
+    z: float = const.Z_SPEC, # use 0 to get observed frame data
+    perform_log_rebin: bool = False,
+    resolution: float | np.ndarray | None = None,
+) -> dict[str, np.ndarray]:
+    """
+    Get the wavelength, flux, and flux error arrays for the SAMI spectrum.
+
+    Parameters
+    ----------
+    file_name: str
+        The name of the file to read.
+    folder_path: Path
+        The path to the folder containing the file.
+    flux_power_of_10: int
+        Desired magnitude of flux (in erg s⁻¹ cm⁻² Å⁻¹). Default is 17.
+    lam_medium: tuple[str, str]
+        The medium of the input wavelength and the desired medium of the output wavelength. "air" or "vacuum".
+    lam_bounds: tuple[float, float] | None
+        The bounds of the wavelength range to keep (rest-frame).
+    rm_or_replace_outside_lam_bounds: bool | float
+        What to do with values outside the wavelength bounds. True to remove, float to
+        replace with, or False to leave as is.
+    rm_or_replace_other_bad_values: bool | float
+        What to do with other bad values. True to remove, float to replace with, or False
+        to leave as is.
+    z: float
+        The redshift of the spectrum. Set to 0 to prevent redshift correction to rest frame.
+    perform_log_rebin: bool
+        Resamples spectrum to logarithmic spacing if True.
+    resolution: float | np.ndarray | None
+        The resolution of the spectrum.
+
+    Returns
+    -------
+    data: dict[str, np.ndarray]
+        A dictionary with the keys "lam", "flux", "flux_err", "fwhm_per_pix", "median_flux",
+        "velscale", "good_mask".
+    """
+    with fits.open(folder_path / file_name) as hdulist:
+        header = hdulist["PRIMARY"].header
+        coord_ref_val_axis_1 = header['CRVAL1']     # coordinate reference value for axis 1
+        coord_ref_pix_axis_1 = header['CRPIX1']     # index location of reference value
+        coord_delta_axis_1 = header['CDELT1']       # pixel width in Angstroms
+        num_pixels_axis_1 = header['NAXIS1']        # number of pixels
+
+        lam_indices = np.arange(1, num_pixels_axis_1+0.5)                           # (fits coordinates are 1-indexed)
+        lam_0 = coord_ref_val_axis_1 - coord_ref_pix_axis_1 * coord_delta_axis_1    # λ_0 = λ_ref - num_pixels_from_start * dλ        
+        lam_obs = lam_0 + lam_indices * coord_delta_axis_1                            # λ_obs = λ_0 + index * dλ
+        lam_rest = lam_obs / (1 + z)  # lam_rest is actually lam_obs if you set z=0
+
+        if np.any(~np.isfinite(lam_rest)):
+            # In theory this should never happen
+            raise ValueError("ERROR: lam has nans")
+
+        flux = hdulist["PRIMARY"].data
+        var = hdulist["VARIANCE"].data
+    
+    err = np.array(np.sqrt(var), dtype=float)
+
+    if lam_medium[0] == "air" and lam_medium[1] == "vacuum":
+        lam_rest =util.air_to_vac(lam_rest)
+    elif lam_medium[0] == "vacuum" and lam_medium[1] == "air":
+        lam_rest = util.vac_to_air(lam_rest)
+    elif not set(lam_medium).issubset({"air", "vacuum"}):
+        raise ValueError(f"Invalid value for lam_medium: {lam_medium}")
+
+    flux *= 10 ** (flux_power_of_10 - 16)
+    err *= 10 ** (flux_power_of_10 - 16)
+
+    if perform_log_rebin:       # necessary for pPXF fitting
+        lam_range = [lam_rest[0], lam_rest[-1]]
+        flux_resampled, ln_lam_rest_resampled, velscale = util.log_rebin(lam_range, flux)
+        err_resampled, _, _ = util.log_rebin(lam_range, err)
+        lam_resampled = np.array(np.exp(ln_lam_rest_resampled))
+    else:
+        flux_resampled = flux
+        err_resampled = err
+        lam_resampled = lam_rest
+        velscale = None
+
+    fwhm_per_pix = lam_rest / resolution if resolution is not None else None
+    
+    median_flux = np.nanmedian(flux_resampled)
+
+    filtered_data = remove_or_replace_bad_values(
+        lam=lam_resampled,
+        flux=flux_resampled,
+        err=err_resampled,
+        fwhm_per_pix=fwhm_per_pix,
+        lam_bounds=lam_bounds,
+        rm_or_replace_outside_lam_bounds=rm_or_replace_outside_lam_bounds,
+        rm_or_replace_other_bad_values=rm_or_replace_other_bad_values
+    )
+
+    return {
+        "lam": filtered_data["lam"],
+        "flux": filtered_data["flux"],
+        "flux_err": filtered_data["flux_err"],
+        "fwhm_per_pix": filtered_data["fwhm_per_pix"],
+        "good_pixels": np.where(filtered_data["good_mask"])[0],
+        "median_flux": median_flux,
+        "velscale": velscale
+    }
+
+def get_sdss_data(
+    file_name: str,
+    folder_path: Path = const.SDSS_DATA_DIR,
+    flux_power_of_10: int = 17,
+    lam_medium: tuple[str, str] = ("air", "vacuum"),
+    lam_bounds: tuple[float, float] | None = const.TOTAL_LAM_BOUNDS,
+    rm_or_replace_outside_lam_bounds: bool | float = True,
+    rm_or_replace_other_bad_values: bool | float = np.nan,
+    z: float = const.Z_SPEC, # use 0 to get observed frame data
+) -> dict[str, np.ndarray]:
+    """
+    Get the wavelength, flux, and flux error arrays for the SDSS spectrum.
+
+    Parameters
+    ----------
+    file_name: str
+        The name of the file to read.
+    folder_path: Path
+        The path to the folder containing the file.
+    flux_power_of_10: int
+        Desired magnitude of flux (in erg s⁻¹ cm⁻² Å⁻¹). Default is 17.
+    lam_medium: tuple[str, str]
+        The medium of the input wavelength and the desired medium of the output wavelength. "air" or "vacuum".
+    lam_bounds: tuple[float, float] | None
+        The bounds of the wavelength range to keep (rest-frame).
+    rm_or_replace_outside_lam_bounds: bool | float
+        What to do with values outside the wavelength bounds. True to remove, float to
+        replace with, or False to leave as is.
+    rm_or_replace_other_bad_values: bool | float
+        What to do with other bad values. True to remove, float to replace with, or False
+        to leave as is.
+    z: float
+        The redshift of the spectrum. Set to 0 to prevent redshift correction to rest frame.
+    perform_log_rebin: bool
+        Resamples spectrum to logarithmic spacing if True.
+    resolution: float | np.ndarray | None
+        The resolution of the spectrum.
+
+    Returns
+    -------
+    data: dict[str, np.ndarray]
+        A dictionary with the keys "lam", "flux", "flux_err", "fwhm_per_pix", "median_flux",
+        "velscale", "good_mask".
+    """
+    with fits.open(folder_path / file_name) as hdulist:
+        image_data = hdulist['COADD'].data
+
+    flux = image_data['flux']
+    inv_var = image_data['ivar']
+    log_lam_obs = image_data['loglam']
+    wdisp = image_data['wdisp']             # Instrumental dispersion of every pixel, in pixels units
+
+    median_flux = np.nanmedian(flux)
+    flux_err = np.sqrt(1 / inv_var)
+
+    lam_obs = 10**log_lam_obs
+    lam_rest = lam_obs / (1 + z)
+
+    ln_lam_obs = log_lam_obs * np.log(10)
+    ln_lam_rest = ln_lam_obs - np.log(1 + z)
+
+    if np.any(~np.isfinite(lam_rest)):
+        raise ValueError("ERROR: lam has nans")
+
+    approx_conv_fac = 1.0
+    if lam_medium[0] == "air" and lam_medium[1] == "vacuum":
+        # use median to get constant scale factor to conserve log spacing
+        approx_conv_fac = np.median(util.air_to_vac(lam_rest)/lam_rest)
+    elif lam_medium[0] == "vacuum" and lam_medium[1] == "air":
+        approx_conv_fac = np.median(util.vac_to_air(lam_rest)/lam_rest)
+    elif not set(lam_medium).issubset({"air", "vacuum"}):
+        raise ValueError(f"Invalid value for lam_medium: {lam_medium}")
+    
+    lam_rest *= approx_conv_fac
+
+    d_lam_rest = np.gradient(lam_rest)                          # Size of every pixel in Angstroms
+    fwhm_per_pix = wdisp * d_lam_rest * const.SIGMA_TO_FWHM     # Resolution FWHM of every pixel, in Angstroms
+
+    d_ln_lam_rest = (ln_lam_rest[-1] - ln_lam_rest[0])/(len(ln_lam_rest) - 1) # average spacing between ln wavelengths
+    velscale = const.C_KM_S*d_ln_lam_rest  
+
+    filtered_data = remove_or_replace_bad_values(
+        lam=lam_rest,
+        flux=flux,
+        err=flux_err,
+        fwhm_per_pix=fwhm_per_pix,
+        lam_bounds=lam_bounds,
+        rm_or_replace_outside_lam_bounds=rm_or_replace_outside_lam_bounds,
+        rm_or_replace_other_bad_values=rm_or_replace_other_bad_values
+    )
+
+    return {
+        "lam": filtered_data["lam"],
+        "flux": filtered_data["flux"],
+        "flux_err": filtered_data["flux_err"],
+        "fwhm_per_pix": filtered_data["fwhm_per_pix"],
+        "good_pixels": np.where(filtered_data["good_mask"])[0],
+        "median_flux": median_flux,
+        "velscale": velscale
+    }
+
 
 def get_sami_lam_flux_err(
     fname: str,

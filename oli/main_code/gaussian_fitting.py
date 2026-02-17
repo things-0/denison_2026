@@ -105,7 +105,7 @@ def fit_gaussians(
     colour_map: Colormap = const.COLOUR_MAP,
     error_opacity: float = const.ERR_OPAC,
     y_axis_label: str = const.SFD_Y_AX_LABEL,
-    x_axis_label: str = const.ANG_LABEL,
+    x_axis_label: str = const.OBS_ANG_LABEL,
     title: str | None = None,
     save_fig_name: str | None = ""
 ) -> tuple[

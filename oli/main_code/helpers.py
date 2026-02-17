@@ -1,10 +1,76 @@
 import numpy as np
 import os
 import ast
+import warnings
 
-from sqlalchemy.util.langhelpers import bool_or_str
+
 
 from . import constants as const
+
+def remove_or_replace_bad_values(
+    lam: np.ndarray,
+    flux: np.ndarray,
+    err: np.ndarray,
+    fwhm_per_pix: np.ndarray,
+    lam_bounds: tuple[float, float] | None,
+    rm_or_replace_outside_lam_bounds: bool | float = True,
+    rm_or_replace_other_bad_values: bool | float = np.nan,
+) -> dict[str, np.ndarray]:
+
+    new_lam = lam.copy()
+    new_flux = flux.copy()
+    new_err = err.copy()
+    new_fwhm_per_pix = fwhm_per_pix.copy()
+
+    not_in_lam_bounds = (lam < lam_bounds[0]) | (lam > lam_bounds[1])
+    if not isinstance(rm_or_replace_outside_lam_bounds, bool):
+        if not rm_or_replace_outside_lam_bounds is np.nan:
+            warn_msg = (
+                f"rm_or_replace_outside_lam_bounds is a float but not nan. "
+                f"This will replace all outside-of-bounds values (including lambdas) "
+                f"with {rm_or_replace_outside_lam_bounds}.")
+            warnings.warn(warn_msg)
+        new_lam[not_in_lam_bounds] = rm_or_replace_outside_lam_bounds
+        new_flux[not_in_lam_bounds] = rm_or_replace_outside_lam_bounds
+        new_err[not_in_lam_bounds] = rm_or_replace_outside_lam_bounds
+        new_fwhm_per_pix[not_in_lam_bounds] = rm_or_replace_outside_lam_bounds
+        lam_bounds_mask = ~not_in_lam_bounds
+    elif rm_or_replace_outside_lam_bounds == True:
+        new_lam = new_lam[~not_in_lam_bounds]
+        new_flux = new_flux[~not_in_lam_bounds]
+        new_err = new_err[~not_in_lam_bounds]
+        new_fwhm_per_pix = new_fwhm_per_pix[~not_in_lam_bounds]
+        # bad values have been removed, so all values are good
+        lam_bounds_mask = np.ones_like(new_lam, dtype=bool)
+    else:
+        lam_bounds_mask = ~not_in_lam_bounds
+
+    bad_mask = (
+        ~np.isfinite(new_flux) | ~np.isfinite(new_err) |
+        (new_flux > const.MAX_FLUX) | (new_flux < const.MIN_FLUX) |
+        (new_err > const.MAX_FLUX) | (new_err <= 0)
+    )
+    if not isinstance(rm_or_replace_other_bad_values, bool):
+        # don't change lam values for other bad values
+        new_flux[bad_mask] = rm_or_replace_other_bad_values
+        new_err[bad_mask] = rm_or_replace_other_bad_values
+        new_fwhm_per_pix[bad_mask] = rm_or_replace_other_bad_values
+        good_mask = lam_bounds_mask & ~bad_mask
+    elif rm_or_replace_other_bad_values == True:
+        new_lam = new_lam[~bad_mask]
+        new_flux = new_flux[~bad_mask]
+        new_err = new_err[~bad_mask]
+        new_fwhm_per_pix = new_fwhm_per_pix[~bad_mask]
+        good_mask = lam_bounds_mask[~bad_mask]
+    else:
+        good_mask = lam_bounds_mask & ~bad_mask
+    return {
+        "lam": new_lam,
+        "flux": new_flux,
+        "flux_err": new_err,
+        "fwhm_per_pix": new_fwhm_per_pix,
+        "good_mask": good_mask
+    }
 
 def custom_showwarning(msg, category, filename, lineno, *args, **kwargs):
     print(f"WARNING ({filename}:{lineno}): {msg}", flush=True)

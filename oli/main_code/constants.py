@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 Z_SPEC = 0.0581892766058445 # for spectroscopy (was 0.0582)
 Z_LUM = 0.05938
@@ -122,10 +123,19 @@ FIG_LAYOUT = "constrained"
 
 VEL_WIDTH_GAUSSIAN_FIT = VEL_PLOT_WIDTH
 
-PPXF_FOLDER_NAME = "data/ppxf_results/"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = ROOT_DIR / "output"
+DATA_DIR = ROOT_DIR / "data"
+SAMI323854_DIR = DATA_DIR / "sami323854"
+SAMI_DATA_DIR = SAMI323854_DIR / "sami_data"
+SDSS_DATA_DIR = SAMI323854_DIR / "sdss_data"
+PPXF_DATA_DIR = DATA_DIR / "ppxf_results"
 
-SDSS_FOLDER_NAME = "data/sami323854/sdss_data/"
+#TODO: remove
 SAMI_FOLDER_NAME = "data/sami323854/sami_data/"
+SDSS_FOLDER_NAME = "data/sami323854/sdss_data/"
+PPXF_FOLDER_NAME = "data/ppxf_results/"
+#
 
 FNAME_2001 = "spec-0469-51913-0338.fits"
 FNAME_2021 = "spec-015167-59252-6747964707.fits"
@@ -140,7 +150,7 @@ FNAME_2015_RED_4_ARCSEC = "323854_A_spectrum_4-arcsec_red.fits"
 VEL_LABEL = r"Velocity (km$\text{s}^{-1}$)"
 MMS_VEL_LABEL = r"Velocity ($10^3$ km$\text{s}^{-1}$)"
 BASE_ANG_LABEL = r"wavelength ($\mathrm{\AA}$)"
-ANG_LABEL = "Observed " + BASE_ANG_LABEL
+OBS_ANG_LABEL = "Observed " + BASE_ANG_LABEL
 REST_ANG_LABEL = "Rest frame " + BASE_ANG_LABEL
 SFD_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻² Å⁻¹"
 FLUX_UNITS_NOT_LATEX = "10⁻¹⁷ erg s⁻¹ cm⁻²"

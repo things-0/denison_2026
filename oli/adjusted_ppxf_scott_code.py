@@ -5,8 +5,10 @@ Functions for analysis of changing look AGN
 
 from time import perf_counter as clock
 from importlib import resources
+from pathlib import Path
 from urllib import request
 import os
+import warnings
 
 from main_code import constants as const
 from main_code import helpers
@@ -14,7 +16,6 @@ from main_code import helpers
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
-import warnings
 
 from ppxf.ppxf import ppxf
 import ppxf.ppxf_util as util

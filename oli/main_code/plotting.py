@@ -139,7 +139,7 @@ def plot_spectra(
     flux22_err: np.ndarray | None = None,
     title: str | None = None,
     y_axis_label: str = const.SFD_Y_AX_LABEL,
-    x_axis_label: str = const.ANG_LABEL,
+    x_axis_label: str = const.OBS_ANG_LABEL,
     error_opacity: float = const.ERR_OPAC,
     ions: dict[str, float] | None = None,
     x_bounds: tuple[float, float] | None = None,
@@ -250,7 +250,7 @@ def plot_polynomial_ratio(
         plt.plot(binned_lambdas, polynom_vals, color='red', label=poly_label, lw=2*const.LINEWIDTH)
 
     plt.plot(lambdas, vals, alpha=0.4, color='black', label=ratio_label, lw = 0.5*const.LINEWIDTH)
-    plt.xlabel(const.ANG_LABEL)
+    plt.xlabel(const.OBS_ANG_LABEL)
     plt.ylabel("Ratio")
     if const.PLOT_TITLES:
         plt.title(title)
@@ -276,7 +276,7 @@ def plot_adjusted_spectrum(
     plt.plot(lam, baseline_flux, color='black', label=f'{baseline_year}', lw = 0.7*const.LINEWIDTH)
     plt.plot(lam, unadjusted_flux, color='orange', label=f'{year_to_adjust}', lw = 0.7*const.LINEWIDTH)
     plt.plot(adjusted_lam, adjusted_flux, color='red', label=f'{year_to_adjust} (polynomial fit to {baseline_year})', lw = 0.7*const.LINEWIDTH)
-    plt.xlabel(const.ANG_LABEL)
+    plt.xlabel(const.OBS_ANG_LABEL)
     plt.ylabel(const.SFD_Y_AX_LABEL)
 
     plot_vert_emission_lines(ions, lam_bounds)
@@ -335,7 +335,7 @@ def plot_diff_spectra_one_fig(
         if isinstance(plot_centres, list):
             raise ValueError("plot_centres must be a single number if use_ang_x_axis is True")
 
-        x_axis_label = const.ANG_LABEL
+        x_axis_label = const.OBS_ANG_LABEL
         x_15, x_21, x_22 = [lam], [lam], [lam]
         diffs_15 = [diff_15] if diff_15 is not None else None
         diffs_21 = [diff_21] if diff_21 is not None else None
@@ -695,7 +695,7 @@ def old_plot_diff_spectra(
         if isinstance(plot_centres, list):
             raise ValueError("plot_centres must be a single number if use_ang_x_axis is True")
 
-        x_axis_label = const.ANG_LABEL
+        x_axis_label = const.OBS_ANG_LABEL
         x_15, x_21, x_22 = [lam], [lam], [lam]
         diffs_15 = [diff_15] if diff_15 is not None else None
         diffs_21 = [diff_21] if diff_21 is not None else None
