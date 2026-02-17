@@ -42,7 +42,7 @@ def get_sami_lam_flux_err(
             areacorr = header['AREACORR']
             flux = flux_uncorrected * areacorr *10 ** (flux_power_of_10 - 16)
         else:
-            flux = flux_uncorrected * 10 ** (flux_power_of_10 - 16)
+            flux = flux_uncorrected * 10 ** (flux_power_of_10 - 16) #TODO: apply this to errors as well (in *all* functions)
         #
         
     # flux = flux_uncorrected * 10 ** (flux_power_of_10 - 16)

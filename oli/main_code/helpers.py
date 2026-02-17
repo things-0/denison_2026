@@ -43,7 +43,12 @@ def convert_vel_to_lam(
     else:
         return (lam_centre_rest_frame * (1 + vel / const.C_KM_S)) * (1 + const.Z_SPEC)
 
-def get_lam_bounds(lam: float, width: float, is_rest_frame: bool = True, width_is_vel: bool = False) -> tuple[float, float]:
+def get_lam_bounds(
+    lam: float, width: float,
+    is_rest_frame: bool = True,
+    width_is_vel: bool = False,
+    return_rest_frame: bool = False
+) -> tuple[float, float]:
     if is_rest_frame:
         obs_lam = lam * (1+const.Z_SPEC)
         rest_lam = lam
@@ -51,11 +56,21 @@ def get_lam_bounds(lam: float, width: float, is_rest_frame: bool = True, width_i
         obs_lam = lam
         rest_lam = lam/(1+const.Z_SPEC)
     if width_is_vel:
-        left = convert_vel_to_lam(-width / 2, lam_centre_rest_frame=rest_lam)
-        right = convert_vel_to_lam(width / 2, lam_centre_rest_frame=rest_lam)
+        left = convert_vel_to_lam(
+            -width / 2, lam_centre_rest_frame=rest_lam,
+            return_rest_frame=return_rest_frame
+        )
+        right = convert_vel_to_lam(
+            width / 2, lam_centre_rest_frame=rest_lam,
+            return_rest_frame=return_rest_frame
+        )
     else:
-        left = obs_lam - width / 2
-        right = obs_lam + width / 2
+        if return_rest_frame:
+            left = rest_lam - width / 2
+            right = rest_lam + width / 2
+        else:
+            left = obs_lam - width / 2
+            right = obs_lam + width / 2
     return left, right
 
 def get_min_res(
@@ -500,8 +515,13 @@ def pretty_print_flux_comparison(
     print("=" * table_width)
     print("^ assuming top-hat filter response")
 
-def get_fwhm(x: np.ndarray, y_gaussian: np.ndarray, get_vel: bool = True) -> float:
-    half_max = np.max(y_gaussian) / 2
+def get_fwhm(
+    x: np.ndarray, y_gaussian: np.ndarray,
+    get_vel: bool = True,
+    lam_centre_rest_frame: float | None = None,
+    lam_left_right_are_rest_frame: bool = False
+) -> float:
+    half_max = np.nanmax(y_gaussian) / 2
     above_half = np.where(y_gaussian >= half_max)[0]
     if len(above_half) < 2:
         raise ValueError("No FWHM found - not enough points above half max")
@@ -510,7 +530,8 @@ def get_fwhm(x: np.ndarray, y_gaussian: np.ndarray, get_vel: bool = True) -> flo
     fwhm_ang = lam_right - lam_left
     if get_vel is False:
         return fwhm_ang
-    lam_centre_rest_frame = ((lam_right + lam_left) / 2) / (1 + const.Z_SPEC)
+    if lam_centre_rest_frame is None:
+        lam_centre_rest_frame = ((lam_right + lam_left) / 2) / (1 + const.Z_SPEC)
     #TD: remove testing
     # lcrf_option_1 = (x[np.argmax(y_gaussian)]) / (1 + Z_SPEC)
     # lcrf_option_2 = ((lam_right + lam_left) / 2) / (1 + Z_SPEC)
@@ -520,8 +541,14 @@ def get_fwhm(x: np.ndarray, y_gaussian: np.ndarray, get_vel: bool = True) -> flo
     # print(f"average lam of lam_left and lam_right: {lcrf_option_2}")
     # print(f"average index of lam_left and lam_right: {lcrf_option_3}")
     #
-    vel_left = convert_lam_to_vel(lam_left, lam_centre_rest_frame)
-    vel_right = convert_lam_to_vel(lam_right, lam_centre_rest_frame)
+    vel_left = convert_lam_to_vel(
+        lam_left, lam_centre_rest_frame,
+        lam_is_rest_frame = lam_left_right_are_rest_frame
+    )
+    vel_right = convert_lam_to_vel(
+        lam_right, lam_centre_rest_frame,
+        lam_is_rest_frame = lam_left_right_are_rest_frame
+    )
     fwhm_vel = vel_right - vel_left
     return fwhm_vel
 

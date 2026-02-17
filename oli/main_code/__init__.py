@@ -8,5 +8,6 @@ from .helpers import *
 from .integrate import *
 from .plotting import *
 from .polynomial_fit import *
+from .ppxf_funcs import *
 from .gaussian_fitting import *
 from .qsofit import *
