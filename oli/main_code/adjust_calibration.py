@@ -6,7 +6,7 @@ from . import constants as const
 def clip_sami_blue_edge(
     unclipped_sami_flux: np.ndarray,
     unclipped_sami_lam: np.ndarray,
-    unclipped_sami_var: np.ndarray,
+    unclipped_sami_err: np.ndarray,
     min_ssd_lam: float
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -18,14 +18,14 @@ def clip_sami_blue_edge(
     # Clip the flux and variance arrays
     clipped_sami_flux = unclipped_sami_flux[clip_idx:]
     clipped_sami_lam = unclipped_sami_lam[clip_idx:]
-    clipped_sami_var = unclipped_sami_var[clip_idx:]
+    clipped_sami_err = unclipped_sami_err[clip_idx:]
 
-    return clipped_sami_flux, clipped_sami_lam, clipped_sami_var
+    return clipped_sami_flux, clipped_sami_lam, clipped_sami_err
 
 
 def gaussian_blur_before_resampling(
-    low_res: np.ndarray | float, 
-    high_res: np.ndarray | float, 
+    low_resolving_power: np.ndarray | float, 
+    high_resolving_power: np.ndarray | float, 
     lam_low_res: np.ndarray,            # should always be lam01?
     lam_high_res: np.ndarray,
     flux_high_res: np.ndarray,
@@ -36,9 +36,10 @@ def gaussian_blur_before_resampling(
     Degrades high_res spectrum to match low_res spectrum.
     """
     # Compute sigma arrays on their native grids
-    sigma_low_res_arr = (lam_low_res / low_res) / 2.355
-    
-    sigma_high_res_arr = (lam_high_res / high_res) / 2.355
+    fwhm_low_res = lam_low_res / low_resolving_power
+    fwhm_high_res = lam_high_res / high_resolving_power
+    sigma_low_res_arr = fwhm_low_res / const.SIGMA_TO_FWHM
+    sigma_high_res_arr = fwhm_high_res / const.SIGMA_TO_FWHM
 
     #TD: remove testing
     # diffs = np.diff(lam_high_res)
@@ -143,8 +144,8 @@ def gaussian_blur_after_resampling(
     fwhm_low_res = lam / low_res
     fwhm_high_res = lam / high_res
 
-    sigma_low_res = fwhm_low_res / 2.355
-    sigma_high_res = fwhm_high_res / 2.355
+    sigma_low_res = fwhm_low_res / const.SIGMA_TO_FWHM
+    sigma_high_res = fwhm_high_res / const.SIGMA_TO_FWHM
     
     # Calculate the kernel sigma needed to convolve high_res to low_res
     # If high_res is already lower resolution, no blurring needed (set to 0)
@@ -163,12 +164,6 @@ def gaussian_blur_after_resampling(
         
         if sigma_pix > const.EPS:
             temp_blurred = gaussian_filter1d(flux_high_res, sigma=sigma_pix)
-            #TD: remove testing
-            # plt.plot(lam, flux_high_res)
-            # plt.plot(lam, temp_blurred)
-            # plt.xlim((lam[start], lam[end-1]))
-            # plt.show()
-            #
             blurred[start:end] = temp_blurred[start:end]
         # else: keep original flux (already copied above)
     

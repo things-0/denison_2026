@@ -7,6 +7,25 @@ from . import constants as const
 
 
 def get_luminosity(flux: float, flux_err: float, z: float = const.Z_LUM) -> float:
+    """
+    Get the luminosity of a given line flux.
+
+    Parameters
+    ----------
+    flux: float
+        The flux of the line in 10^-17 erg/s/cm^2.
+    flux_err: float
+        The error on the flux of the line in 10^-17 erg/s/cm^2.
+    z: float = const.Z_LUM
+        The redshift of the object (used for luminosity distance calculation).
+
+    Returns
+    -------
+    luminosity: float
+        The luminosity of the line in erg/s.
+    lum_err: float
+        The error on the luminosity of the line in erg/s.
+    """
     dist = cosmo.luminosity_distance(z)
     dist_cm = dist.to(u.cm)
 
@@ -28,12 +47,21 @@ def get_bh_mass(
     Estimate BH mass from Halpha line. Using the equation from Greene & Ho 2005
     
     Parameters:
-    l_ha : Halpha luminosity in erg/s (with error l_ha_err)
-    fwhm_ha : Halpha line FWHM in km/s (with error fwhm_ha_err)
+    lum_alpha: float
+        The luminosity of the Hα line in erg/s.
+    lum_alpha_err: float
+        The error on the luminosity of the Hα line in erg/s.
+    fwhm_alpha: float
+        The FWHM of the Hα line in km/s.
+    fwhm_alpha_err: float
+        The error on the FWHM of the Hα line in km/s.
 
-    Returns:
-    mbh : Black hole mass in solar masses (with error mbh_err)
-    Note: mbh_err calculated using log(mass) for easier calculation
+    Returns
+    -------
+    mbh: float
+        The BH mass in solar masses.
+    mbh_err: float
+        The error on the BH mass in solar masses.
     """
     coeff = 2.0e6   # a
     exp_lum = 0.55  # b

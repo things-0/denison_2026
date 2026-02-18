@@ -454,7 +454,7 @@ def plot_fit_comp(
         plt.xlabel(r'Wavelength [$\AA$]')
         plt.ylabel('Flux')
         # plt.tight_layout()
-    plt.title("All Gas components")
+    plt.title(f"All Gas components ({in_file_suffix})")
     plt.legend()
     plt.show()
         
@@ -474,7 +474,7 @@ def plot_fit_comp(
     ax1.plot(lam, galaxy, 'k', label="galaxy")
     ax1.plot(lam, bestfit, 'm', label="bestfit")
     ax1.plot(lam, stellar, 'r', label="stellar")
-    ax1.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f'full spectrum')
+    ax1.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f'full spectrum {in_file_suffix}')
     ymax = galaxy[lam > 3700].max()
     ymin = galaxy[lam > 3700].min()
     yrange = ymax-ymin

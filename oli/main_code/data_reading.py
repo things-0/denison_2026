@@ -5,6 +5,10 @@ import astropy.io.fits as fits
 import ppxf.ppxf_util as util
 from PyAstronomy import pyasl
 
+#TODO: remove testing
+import matplotlib.pyplot as plt
+#
+
 from pathlib import Path
 import warnings
 
@@ -23,7 +27,7 @@ def get_sami_data(
     rm_or_replace_other_bad_values: bool | float = np.nan,
     z: float = const.Z_SPEC, # use 0 to get observed frame data
     perform_log_rebin: bool = False,
-    resolution: float | np.ndarray | None = None,
+    resolving_power: float | np.ndarray | None = None,
 ) -> dict[str, np.ndarray]:
     """
     Get the wavelength, flux, and flux error arrays for the SAMI spectrum.
@@ -50,8 +54,8 @@ def get_sami_data(
         The redshift of the spectrum. Set to 0 to prevent redshift correction to rest frame.
     perform_log_rebin: bool
         Resamples spectrum to logarithmic spacing if True.
-    resolution: float | np.ndarray | None
-        The resolution of the spectrum.
+    resolving_power: float | np.ndarray | None
+        The resolving power of the spectrum.
 
     Returns
     -------
@@ -101,10 +105,14 @@ def get_sami_data(
         lam_resampled = lam_rest
         velscale = None
 
-    fwhm_per_pix = lam_rest / resolution if resolution is not None else None
+    if resolving_power is not None:
+        fwhm_per_pix = lam_rest / resolving_power
+    else:
+        warn_msg = "Resolving power data not provided. Setting fwhm_per_pix to None."
+        warnings.warn(warn_msg)
+        fwhm_per_pix = None
     
     median_flux = np.nanmedian(flux_resampled)
-
     filtered_data = remove_or_replace_bad_values(
         lam=lam_resampled,
         flux=flux_resampled,
@@ -172,11 +180,21 @@ def get_sdss_data(
     with fits.open(folder_path / file_name) as hdulist:
         image_data = hdulist['COADD'].data
 
-    flux = image_data['flux']
-    inv_var = image_data['ivar']
-    log_lam_obs = image_data['loglam']
-    wdisp = image_data['wdisp']             # Instrumental dispersion of every pixel, in pixels units
 
+        flux = image_data['flux']
+        inv_var = image_data['ivar']
+        log_lam_obs = image_data['loglam']
+        wdisp = image_data['wdisp']             # Instrumental dispersion of every pixel (pixels units)
+        try:
+            wresl = image_data['wresl']         # FWHM resolution accounting for instrumental + other dispersion (Angstroms)
+            mjd = hdulist['SPALL'].data['MJD'][0]
+        except KeyError: # wresl unavailable for 2001 spectrum
+            warn_msg = f"Wavelength resolution data not available in {file_name}"
+            warnings.warn(warn_msg)
+            wresl = None
+            mjd = hdulist['SPZLINE'].data['MJD'][0]
+
+    flux *= 10 ** (flux_power_of_10 - 17)
     median_flux = np.nanmedian(flux)
     flux_err = np.sqrt(1 / inv_var)
 
@@ -200,8 +218,12 @@ def get_sdss_data(
     
     lam_rest *= approx_conv_fac
 
-    d_lam_rest = np.gradient(lam_rest)                          # Size of every pixel in Angstroms
-    fwhm_per_pix = wdisp * d_lam_rest * const.SIGMA_TO_FWHM     # Resolution FWHM of every pixel, in Angstroms
+    d_lam_rest = np.gradient(lam_rest)                              # Size of every pixel in Angstroms
+    if wresl is None:
+        fwhm_per_pix_unscaled = wdisp * d_lam_rest * const.SIGMA_TO_FWHM     # Resolution FWHM of every pixel, in Angstroms
+        fwhm_per_pix = fwhm_per_pix_unscaled * const.WDISP_SCALE_FACTOR # scale to account for non instrumental dispersion
+    else:
+        fwhm_per_pix = wresl
 
     d_ln_lam_rest = (ln_lam_rest[-1] - ln_lam_rest[0])/(len(ln_lam_rest) - 1) # average spacing between ln wavelengths
     velscale = const.C_KM_S*d_ln_lam_rest  
@@ -504,13 +526,14 @@ def get_adjusted_data(
     resampled_xlim: tuple[float, float] | None = None,
     resampled_and_blurred_xlim: tuple[float, float] | None = None,
     resampled_and_blurred_vlines: dict[str, float] | None = None,
-    sdss_folder_name: str = const.SDSS_FOLDER_NAME,
-    sami_folder_name: str = const.SAMI_FOLDER_NAME,
+    sdss_folder_path: Path = const.SDSS_DATA_DIR,
+    sami_folder_path: Path = const.SAMI_DATA_DIR,
     fname_2001: str = const.FNAME_2001,
     fname_2015_blue: str = const.FNAME_2015_BLUE_3_ARCSEC,
     fname_2015_red: str = const.FNAME_2015_RED_3_ARCSEC,
     fname_2021: str = const.FNAME_2021,
-    fname_2022: str = const.FNAME_2022
+    fname_2022: str = const.FNAME_2022,
+    z: float = const.Z_SPEC
 ) -> (
     tuple[np.ndarray, tuple[
         np.ndarray, np.ndarray
@@ -538,47 +561,83 @@ def get_adjusted_data(
     plot_just_resampled = plot_just_resampled or resampled_xlim is not None
     plot_resampled_and_blurred = plot_resampled_and_blurred or resampled_and_blurred_xlim is not None
     
-    flux01, lam01, ivar01 = sdss_read(sdss_folder_name + fname_2001, return_wresl=False) # 2001 file
-    flux21, lam21, ivar21, fwhm21 = sdss_read(sdss_folder_name + fname_2021) # 2021 file
-    flux22, lam22, ivar22, fwhm22 = sdss_read(sdss_folder_name + fname_2022) # 2022 file
-    
-    if len(lam21) != len(lam22) or len(lam01) != len(lam21):
-        raise ValueError("ERROR: mismatch in number of wavelength points. Try adjusting TOTAL_LAM_BOUNDS.")
+    input_data01 = get_sdss_data(fname_2001, folder_path=sdss_folder_path, z=z)
+    input_data15_blue = get_sami_data(fname_2015_blue, folder_path=sami_folder_path, z=z, resolving_power=const.RES_15_BLUE)
+    input_data15_red = get_sami_data(fname_2015_red, folder_path=sami_folder_path, z=z, resolving_power=const.RES_15_RED)
+    input_data21 = get_sdss_data(fname_2021, folder_path=sdss_folder_path, z=z)
+    input_data22 = get_sdss_data(fname_2022, folder_path=sdss_folder_path, z=z)
 
-    flux15_blue, lam15_blue, var15_blue = sami_read_apspec(
-        sami_folder_name + fname_2015_blue,
-        "PRIMARY", "VARIANCE"
+    lam01, lam15_blue, lam15_red, lam21, lam22 = (
+        input_data01["lam"], input_data15_blue["lam"],
+        input_data15_red["lam"], input_data21["lam"], input_data22["lam"]
     )
-    flux15_red, lam15_red, var15_red = sami_read_apspec(
-        sami_folder_name + fname_2015_red,
-        "PRIMARY", "VARIANCE"
+    flux01, flux15_blue, flux15_red, flux21, flux22 = (
+        input_data01["flux"], input_data15_blue["flux"],
+        input_data15_red["flux"], input_data21["flux"], input_data22["flux"]
     )
+    err01, err15_blue, err15_red, err21, err22 = (
+        input_data01["flux_err"], input_data15_blue["flux_err"],
+        input_data15_red["flux_err"], input_data21["flux_err"], input_data22["flux_err"]
+    )
+    fwhm01, fwhm15_blue, fwhm15_red, fwhm21, fwhm22 = (
+        input_data01["fwhm_per_pix"], input_data15_blue["fwhm_per_pix"],
+        input_data15_red["fwhm_per_pix"], input_data21["fwhm_per_pix"], input_data22["fwhm_per_pix"]
+    )
+    
+    # flux01, lam01, ivar01 = sdss_read(sdss_folder_name + fname_2001, return_wresl=False) # 2001 file
+    # flux21, lam21, ivar21, fwhm21 = sdss_read(sdss_folder_name + fname_2021) # 2021 file
+    # flux22, lam22, ivar22, fwhm22 = sdss_read(sdss_folder_name + fname_2022) # 2022 file
+
+    target_sdss_len = len(lam22)
+    for sdss_arr in [lam01, lam21, lam22, flux01, flux21, flux22, err01, err21, err22, fwhm01, fwhm21, fwhm22]:
+        if len(sdss_arr) != target_sdss_len:
+            raise ValueError("ERROR: mismatch in number of wavelength points. Try adjusting TOTAL_LAM_BOUNDS.")
+    target_sami_blue_len = len(lam15_blue)
+    for sami_blue_arr in [lam15_blue, flux15_blue, err15_blue, fwhm15_blue]:
+        if len(sami_blue_arr) != target_sami_blue_len:
+            raise ValueError("ERROR: mismatch in number of wavelength points")
+    target_sami_red_len = len(lam15_red)
+    for sami_red_arr in [lam15_red, flux15_red, err15_red, fwhm15_red]:
+        if len(sami_red_arr) != target_sami_red_len:
+            raise ValueError("ERROR: mismatch in number of wavelength points")
+
+    # flux15_blue, lam15_blue, var15_blue = sami_read_apspec(
+    #     sami_folder_name + fname_2015_blue,
+    #     "PRIMARY", "VARIANCE"
+    # )
+    # flux15_red, lam15_red, var15_red = sami_read_apspec(
+    #     sami_folder_name + fname_2015_red,
+    #     "PRIMARY", "VARIANCE"
+    # )
 
     # inverse variance -> variance
-    var01 = 1 / ivar01
-    var21 = 1 / ivar21
-    var22 = 1 / ivar22
+    # var01 = 1 / ivar01
+    # var21 = 1 / ivar21
+    # var22 = 1 / ivar22
 
-    res_21 = lam21 / fwhm21
-    res_22 = lam22 / fwhm22
-    # Note: fwhm01 (wresl) not available
-    res_01 = (res_21 + res_22) / 2
+    resolving_power01 = lam01 / fwhm01
+    resolving_power15_blue = const.RES_15_BLUE
+    resolving_power15_red = const.RES_15_RED
+    resolving_power21 = lam21 / fwhm21
+    resolving_power22 = lam22 / fwhm22
     #
 
-    res_min = get_min_res(
-        res_01,
-        res_21,
-        res_22,
-    )
+    min_resolving_power = np.min((
+        resolving_power01, resolving_power21,
+        # np.full_like(lam01, resolving_power15_blue), # already know these have better resolutions
+        # np.full_like(lam01, resolving_power15_red),
+        resolving_power22
+    ), axis=0)
+
     if plot_res_coverage:
         plot_min_res(
-            lam_sdss=lam21,
+            lam_sdss=lam22,
             lam15_blue=lam15_blue,
             lam15_red=lam15_red,
-            res_min=res_min,
-            res_01=res_01,
-            res_21=res_21,
-            res_22=res_22,
+            res_min=min_resolving_power,
+            res01=resolving_power01,
+            res21=resolving_power21,
+            res22=resolving_power22,
             plot_RES_15_RED=False
         )
 
@@ -596,11 +655,11 @@ def get_adjusted_data(
             x_bounds=as_is_xlim
         )
 
-    err01 = np.sqrt(var01)
-    err15_blue = np.sqrt(var15_blue)
-    err15_red = np.sqrt(var15_red)
-    err21 = np.sqrt(var21)
-    err22 = np.sqrt(var22)
+    # err01 = np.sqrt(var01)
+    # err15_blue = np.sqrt(var15_blue)
+    # err15_red = np.sqrt(var15_red)
+    # err21 = np.sqrt(var21)
+    # err22 = np.sqrt(var22)
     
     if return_as_is:
         return (
@@ -613,10 +672,9 @@ def get_adjusted_data(
 
     if blur_before_resampling:
         min_ssd_lam = np.min(lam01)
-        flux15_blue_clipped, lam15_blue_clipped, var15_blue_clipped = clip_sami_blue_edge(
-            flux15_blue, lam15_blue, var15_blue, min_ssd_lam
+        flux15_blue_clipped, lam15_blue_clipped, err15_blue_clipped = clip_sami_blue_edge(
+            flux15_blue, lam15_blue, err15_blue, min_ssd_lam
         )
-        err15_blue_clipped = np.sqrt(var15_blue_clipped)
 
         if plot_clipped:
             plot_spectra(
@@ -640,11 +698,11 @@ def get_adjusted_data(
             # print(f"SAMI 2015 mean red flux error: {np.nanmean(err15_red)}")
             #
         
-        flux01_blurred = gaussian_blur_before_resampling(res_min, res_01, lam01, lam01, flux01)
-        flux21_blurred = gaussian_blur_before_resampling(res_min, res_21, lam01, lam21, flux21)
-        flux22_blurred = gaussian_blur_before_resampling(res_min, res_22, lam01, lam22, flux22)
-        flux15_red_blurred = gaussian_blur_before_resampling(res_min, const.RES_15_RED, lam01, lam15_red, flux15_red)
-        flux15_blue_blurred = gaussian_blur_before_resampling(res_min, const.RES_15_BLUE, lam01, lam15_blue_clipped, flux15_blue_clipped)
+        flux01_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power01, lam01, lam01, flux01)
+        flux21_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power21, lam01, lam21, flux21)
+        flux22_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power22, lam01, lam22, flux22)
+        flux15_red_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power15_red, lam01, lam15_red, flux15_red)
+        flux15_blue_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power15_blue, lam01, lam15_blue_clipped, flux15_blue_clipped)
 
         if plot_just_blurred:
             plot_spectra(
@@ -740,11 +798,11 @@ def get_adjusted_data(
 
         wavelength_step = np.median(np.diff(lam01))
 
-        flux01_resampled_blurred = gaussian_blur_after_resampling(res_min, res_01, lam01, flux01_resampled, wavelength_step)
-        flux21_resampled_blurred = gaussian_blur_after_resampling(res_min, res_21, lam01, flux21_resampled, wavelength_step)
-        flux22_resampled_blurred = gaussian_blur_after_resampling(res_min, res_22, lam01, flux22_resampled, wavelength_step)
-        flux15_red_resampled_blurred = gaussian_blur_after_resampling(res_min, const.RES_15_RED, lam01, flux15_red_resampled, wavelength_step)
-        flux15_blue_resampled_blurred = gaussian_blur_after_resampling(res_min, const.RES_15_BLUE, lam01, flux15_blue_resampled, wavelength_step)
+        flux01_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power01, lam01, flux01_resampled, wavelength_step)
+        flux21_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power21, lam01, flux21_resampled, wavelength_step)
+        flux22_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power22, lam01, flux22_resampled, wavelength_step)
+        flux15_red_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power15_red, lam01, flux15_red_resampled, wavelength_step)
+        flux15_blue_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power15_blue, lam01, flux15_blue_resampled, wavelength_step)
 
         flux15_resampled_blurred = np.fmax(flux15_blue_resampled_blurred, flux15_red_resampled_blurred)
         if (

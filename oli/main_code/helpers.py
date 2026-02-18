@@ -2,10 +2,41 @@ import numpy as np
 import os
 import ast
 import warnings
+from typing import Any
 
 
 
 from . import constants as const
+
+# def get_res_data(
+#     fwhm_spec_res: np.ndarray | None = None, # wresl
+#     wdisp: np.ndarray | None = None,
+#     resolving_power: np.ndarray | float | None = None, # RES_15_BLUE or RES_15_RED
+#     sigma: np.ndarray | float | None = None,
+# ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+#     arr_len = 1
+#     none_count = 0
+#     for data in [fwhm_spec_res, wdisp, resolving_power, sigma]:
+#         if data is None:
+#             none_count += 1
+#         elif isinstance(data, np.ndarray):
+#             if arr_len != 1 and len(data) != arr_len:
+#                 raise ValueError("all arrays must have the same length")
+#     if none_count in [0, 4]:
+#         raise ValueError("Must have 1-3 None arguments")
+#     if isinstance(resolving_power, float):
+#         resolving_power = np.full(arr_len, resolving_power)
+#     if isinstance(sigma, float):
+#         sigma = np.full(arr_len, sigma)
+
+#     if fwhm_spec_res is not None:
+#         return fwhm_spec_res, fwhm_spec_res, resolving_power
+#     elif wdisp is not None:
+#         return wdisp, wdisp, resolving_power
+#     elif resolving_power is not None:
+#         return resolving_power, resolving_power, resolving_power
+#     else:
+#         raise ValueError("No resolution data provided")
 
 def remove_or_replace_bad_values(
     lam: np.ndarray,
@@ -16,6 +47,34 @@ def remove_or_replace_bad_values(
     rm_or_replace_outside_lam_bounds: bool | float = True,
     rm_or_replace_other_bad_values: bool | float = np.nan,
 ) -> dict[str, np.ndarray]:
+    """
+
+    Parameters
+    ----------
+    lam: np.ndarray
+        Wavelength (Å).
+    flux: np.ndarray
+        Flux.
+    err: np.ndarray
+        Flux error.
+    fwhm_per_pix: np.ndarray
+        FWHM per pixel.
+    lam_bounds: tuple[float, float] | None
+        Wavelength bounds.
+    rm_or_replace_outside_lam_bounds: bool | float = True
+        What to do with values outside the wavelength bounds. True to remove, float to
+        replace with, or False to leave as is. Note: using a float will change the lam
+        values.
+    rm_or_replace_other_bad_values: bool | float = np.nan
+        What to do with other bad values. True to remove, float to replace with, or False
+        to leave as is. Note: using a float will not change any of the lam values.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        A dictionary with the keys "lam", "flux", "flux_err", "fwhm_per_pix", "good_mask",
+        and the corresponding removed/replaced values.
+    """
 
     new_lam = lam.copy()
     new_flux = flux.copy()
@@ -73,92 +132,93 @@ def remove_or_replace_bad_values(
     }
 
 def custom_showwarning(msg, category, filename, lineno, *args, **kwargs):
+    """
+    Custom warning handler.
+    """
     print(f"WARNING ({filename}:{lineno}): {msg}", flush=True)
 
 def get_first_valid_flux(flux: np.ndarray):
+    """
+    Get the first finite flux value.
+    """
     return flux[np.where(np.isfinite(flux))[0][0]]
 
 def convert_lam_to_vel(
     lam: np.ndarray | float,
-    lam_centre_rest_frame: float = const.H_ALPHA,
-    lam_is_rest_frame: bool = False
+    lam_centre: float
 ) -> np.ndarray | float:
     """
     Convert wavelength (Å) to velocity (km/s). 
-    Set `lam_is_rest_frame` to `True` if the `lam`
-    float or array to be converted is already in
-    the rest frame.
+
+    Parameters
+    ----------
+    lam: np.ndarray | float
+        Wavelength (Å) to convert to velocity (km/s).
+    lam_centre: float
+        Centre wavelength (Å) of the line (0 km/s).
+
+    Returns
+    -------
+    np.ndarray | float
+        Velocity (km/s).
     """
     # v = c * Δλ / λ_cent
-    if lam_is_rest_frame:
-        return (lam - lam_centre_rest_frame) * const.C_KM_S / lam_centre_rest_frame
-    else:
-        return (lam / (1 + const.Z_SPEC) - lam_centre_rest_frame) * const.C_KM_S / lam_centre_rest_frame
+    return (lam - lam_centre) * const.C_KM_S / lam_centre
 
 def convert_vel_to_lam(
     vel: np.ndarray | float,
-    lam_centre_rest_frame: float = const.H_ALPHA,
-    return_rest_frame: bool = False
+    lam_centre: float
 ) -> np.ndarray | float:
     """
     Convert velocity (km/s) to wavelength (Å).
+
+    Parameters
+    ----------
+    vel: np.ndarray | float
+        Velocity (km/s) to convert to wavelength (Å).
+    lam_centre: float
+        Centre wavelength (Å) of the line (0 km/s).
+
+    Returns
+    -------
+    np.ndarray | float
+        Wavelength (Å).
     """
     # λ = λ_cent * (1 + v / c)
-    if return_rest_frame:
-        return lam_centre_rest_frame * (1 + vel / const.C_KM_S)
-    else:
-        return (lam_centre_rest_frame * (1 + vel / const.C_KM_S)) * (1 + const.Z_SPEC)
+    return lam_centre * (1 + vel / const.C_KM_S)
 
 def get_lam_bounds(
-    lam: float, width: float,
-    is_rest_frame: bool = True,
+    lam_centre: float, width: float,
     width_is_vel: bool = False,
-    return_rest_frame: bool = False
 ) -> tuple[float, float]:
-    if is_rest_frame:
-        obs_lam = lam * (1+const.Z_SPEC)
-        rest_lam = lam
-    else:
-        obs_lam = lam
-        rest_lam = lam/(1+const.Z_SPEC)
+    """
+    Get the wavelength bounds for a given width and centre wavelength.
+
+    Parameters
+    ----------
+    lam_centre: float
+        Centre wavelength (Å) of the line (0 km/s).
+    width: float
+        Desired width of the lam bounds.
+    width_is_vel: bool = False
+        Whether the width is in velocity (km/s) or wavelength (Å).
+
+    Returns
+    -------
+    tuple[float, float]
+        The left and right wavelength bounds (Å).
+    """
     if width_is_vel:
         left = convert_vel_to_lam(
-            -width / 2, lam_centre_rest_frame=rest_lam,
-            return_rest_frame=return_rest_frame
+            vel=-width / 2, lam_centre=lam_centre,
         )
         right = convert_vel_to_lam(
-            width / 2, lam_centre_rest_frame=rest_lam,
-            return_rest_frame=return_rest_frame
+            vel=width / 2, lam_centre=lam_centre,
         )
     else:
-        if return_rest_frame:
-            left = rest_lam - width / 2
-            right = rest_lam + width / 2
-        else:
-            left = obs_lam - width / 2
-            right = obs_lam + width / 2
+        left = lam_centre - width / 2
+        right = lam_centre + width / 2
     return left, right
-
-def get_min_res(
-    res_01: np.ndarray,
-    res_21: np.ndarray,
-    res_22: np.ndarray
-) -> np.ndarray:
-    # res_min = np.minimum(np.minimum(
-    #     res_21, 
-    #     res_22
-    # ), RES_15_BLUE)
-
-    #TODO: check logic with Scott
-    res_min = np.minimum(
-        res_21, 
-        res_22
-    )
-    #
-
-    res_min =  res_min / const.SMOOTH_FACTOR
-
-    return res_min
 
 def bin_data_by_median(
     x: np.ndarray, y: np.ndarray, bin_width: float,
@@ -193,10 +253,30 @@ def convert_to_vel_data(
     lam: np.ndarray,
     flux: np.ndarray | None,
     flux_err: np.ndarray | None,
-    centres_rest_ang: float | list[float],
-    vel_width: float | None,
-    vel_units: str = "km/s"
+    lam_centres: float | list[float],
+    vel_width: float | None
 ) -> tuple[list[np.ndarray] | None, list[np.ndarray] | None, list[np.ndarray] | None]:
+    """
+    Gets the lams, fluxes and flux errors in velocity space for a given list of lam centres and widths.
+    
+    Parameters
+    ----------
+    lam: np.ndarray
+        Wavelength (Å).
+    flux: np.ndarray | None
+        Flux.
+    flux_err: np.ndarray | None
+        Flux error.
+    lam_centres: float | list[float]
+        Centre wavelengths (Å) of the lines (0 km/s).
+    vel_width: float | None
+        Width of the velocity space (km/s).
+
+    Returns
+    -------
+    tuple[list[np.ndarray] | None, list[np.ndarray] | None, list[np.ndarray] | None]
+        The trimmed lams, fluxes and flux errors in velocity space, each with width `vel_width`.
+    """
 
     if flux is None:
         return None, None, None
@@ -205,19 +285,15 @@ def convert_to_vel_data(
     trimmed_fluxes = []
     trimmed_flux_errs = [] if flux_err is not None else None
     
-    if not isinstance(centres_rest_ang, list):
-        centres_rest_ang = [centres_rest_ang]
+    if not isinstance(lam_centres, list):
+        lam_centres = [lam_centres]
 
-    for centre in centres_rest_ang:
-        vel = convert_lam_to_vel(lam, lam_centre_rest_frame=centre)
+    for lam_centre in lam_centres:
+        vel = convert_lam_to_vel(lam, lam_centre=lam_centre)
         vel_width_mask = (vel >= -vel_width / 2) & (vel <= vel_width / 2)
         
         trimmed_vel = vel[vel_width_mask]
         trimmed_flux = flux[vel_width_mask]
-        if vel_units == "Mm/s":
-            trimmed_vel *= 1e-3
-        elif vel_units != "km/s":
-            raise NotImplementedError("vel_units must be km/s or Mm/s")
         
         trimmed_vels.append(trimmed_vel)
         trimmed_fluxes.append(trimmed_flux)
@@ -227,7 +303,6 @@ def convert_to_vel_data(
             trimmed_flux_errs.append(trimmed_flux_err)
     
 
-        
     # check if all trimmed_vels are the same
     # if not all(np.all(trimmed_vel == trimmed_vels[0]) for trimmed_vel in trimmed_vels):
     #     print(trimmed_vels)
@@ -235,9 +310,32 @@ def convert_to_vel_data(
     
     return trimmed_vels, trimmed_fluxes, trimmed_flux_errs
 
-def get_radius_from_med(lam: np.ndarray, flux: np.ndarray) -> float:
+def get_radius_from_med(
+    lam: np.ndarray,
+    flux: np.ndarray,
+    scale_factor: float = 100
+) -> float:
+    """
+    Finds an appropriate y distance from the median of the flux by
+    considering the difference between binned data points. Note:
+    the median of the flux is not actually calculated in this function.
+
+    Parameters
+    ----------
+    lam: np.ndarray
+        Wavelength (Å).
+    flux: np.ndarray
+        Flux.
+    scale_factor: float = 100
+        Scale factor to apply to the difference between binned data points.
+
+    Returns
+    -------
+    float
+        The distance from the median of the flux.
+    """
     _, flux_binned, _ = bin_data_by_median(lam, flux, 20)
-    return np.nanmedian(np.abs(np.diff(flux_binned))) * 100
+    return np.nanmedian(np.abs(np.diff(flux_binned))) * scale_factor
 
 def update_min_med_max_fluxes(
     flux: np.ndarray,
@@ -250,20 +348,57 @@ def update_min_med_max_fluxes(
     suggested_upper_bounds: list[tuple[float, float]],
     radius_from_med: int
 ) -> tuple[float, float, float, float]:
+    """
+    Updates the min, max, reasonable min and reasonable max fluxes, and appends
+    to the suggested lower and upper bound lists. Fluxe bounds are considered
+    reasonable if the flux is within the `radius_from_med` radius from the median.
+
+    Parameters
+    ----------
+    flux: np.ndarray
+        Flux.
+    median_fluxes: list[float]
+        List of median fluxes.
+    min_flux: float
+        Minimum flux.
+    max_flux: float
+        Maximum flux.
+    reasonable_min_flux: float
+        Reasonable minimum flux.
+    reasonable_max_flux: float
+        Reasonable maximum flux.
+    suggested_lower_bounds: list[tuple[float, float]]
+        Suggested lower bounds.
+    suggested_upper_bounds: list[tuple[float, float]]
+        Suggested upper bounds.
+    radius_from_med: int
+        Radius from the median.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        The new min, max, reasonable min and reasonable max fluxes.
+    """
+
     new_max = np.max((max_flux, np.nanmax(flux)))
     new_min = np.min((min_flux, np.nanmin(flux)))
     med = np.nanmedian(flux)
     median_fluxes.append(med)
+
     suggested_lower_bounds.append(med - radius_from_med)
-    suggested_upper_bounds.append(med + radius_from_med)    
+    suggested_upper_bounds.append(med + radius_from_med)  
+
     if np.nanmin(flux) >= med - radius_from_med:
         new_reasonable_min_flux = np.min((reasonable_min_flux, np.nanmin(flux)))
     else:
+        # min of flux is too small. don't update reasonable min
         new_reasonable_min_flux = reasonable_min_flux
     if np.nanmax(flux) <= med + radius_from_med:
         new_reasonable_max_flux = np.max((reasonable_max_flux, np.nanmax(flux)))
     else:
+        # max of flux is too large. don't update reasonable max
         new_reasonable_max_flux = reasonable_max_flux
+
     suggested_lower_bounds.append(med - radius_from_med)
     suggested_upper_bounds.append(med + radius_from_med)
     return new_min, new_max, new_reasonable_min_flux, new_reasonable_max_flux
@@ -274,13 +409,35 @@ def get_better_y_bounds(
     lams: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
     fluxes: list[np.ndarray | tuple[np.ndarray, np.ndarray]],
     calculate_radius_from_med: bool = True,
-    radius_from_med: int = 40
+    radius_from_med: int = 40,
+    perc_rad_from_reasonable_bounds: float = 7.0
 ) -> tuple[float | None, float | None]:
+    """
+    Gets better y bounds for a given list of lams and fluxes to plot.
+
+    Parameters
+    ----------
+    y_bounds: tuple[float, float] | None
+        The current y bounds.
+    lams: list[np.ndarray | tuple[np.ndarray, np.ndarray]]
+        The lams to plot.
+    fluxes: list[np.ndarray | tuple[np.ndarray, np.ndarray]]
+        The fluxes to plot.
+    calculate_radius_from_med: bool = True
+        Whether to calculate the radius from the median. `radius_from_med` is used if False.
+    radius_from_med: int = 40
+        The radius from the median.
+    perc_rad_from_reasonable_bounds: float = 7.0
+        The percentage of the reasonable bounds to add to the y bounds.
+
+    Returns
+    -------
+    tuple[float | None, float | None]
+        The better y bounds.
+    """
+
     if y_bounds is not None:
         return y_bounds
-
-    y_lower = None
-    y_upper = None
 
     median_fluxes = []
     max_flux = -np.inf
@@ -326,16 +483,22 @@ def get_better_y_bounds(
                 radius
             )
     
+    y_lower = None
+    y_upper = None
+
     if max_flux > np.max(suggested_upper_bounds):
+        # max of flux is too large. use reasonable max (plus a little bit) if available, otherwise use suggested upper bound
         if np.isfinite(reasonable_max_flux):
-            y_upper = reasonable_max_flux * 1.07
+            y_upper = reasonable_max_flux * (1 + perc_rad_from_reasonable_bounds / 100)
         else:
             y_upper = np.max(suggested_upper_bounds)
     if min_flux < np.min(suggested_lower_bounds):
+        # min of flux is too small. use reasonable min (minus a little bit) if available, otherwise use suggested lower bound
         if np.isfinite(reasonable_min_flux) and np.isfinite(reasonable_max_flux):
-            y_lower = reasonable_min_flux - 0.07 * reasonable_max_flux
+            y_lower = reasonable_min_flux - reasonable_max_flux * (perc_rad_from_reasonable_bounds / 100)
         else:
             y_lower = np.min(suggested_lower_bounds)
+    # if y_bounds are reasonable, return None (automatic scaling by matplotlib)
     return y_lower, y_upper
 
 def convert_flux_to_mJy(
@@ -381,24 +544,57 @@ def convert_flux_to_mJy(
     
     return flux_density_mjy
 
-def get_vel_lam_mask(
+def get_lam_mask( # was get_vel_lam_mask
     lam: np.ndarray,
-    vel_width: float,
-    vel_centre_ang: float,
-    lam_is_rest_frame: bool = False
+    width: float,
+    lam_centre: float,
+    width_is_vel: bool = True,
 ) -> np.ndarray:
     """
-    Get a mask for the wavelength array based on the velocity width and centre wavelength.
+    Get a mask for the wavelength array based on the width and centre wavelength.
+
+    Parameters
+    ----------
+    lam: np.ndarray
+        Wavelength (Å).
+    width: float
+        Width of the True mask.
+    lam_centre: float
+        Centre wavelength (Å).
+    width_is_vel: bool = True
+        Whether the width is in velocity (km/s) or wavelength (Å).
+
+    Returns
+    -------
+    np.ndarray
+        A mask for the wavelength array.
     """
-    vel = convert_lam_to_vel(lam, lam_centre_rest_frame=vel_centre_ang, lam_is_rest_frame=lam_is_rest_frame)
-    vel_width_mask = (vel >= -vel_width / 2) & (vel <= vel_width / 2)
-    return vel_width_mask
+    lam_bounds = get_lam_bounds(lam_centre, width, width_is_vel=width_is_vel)
+    return (lam >= lam_bounds[0]) & (lam <= lam_bounds[1])
 
 def get_masked_diffs(
     x: np.ndarray,
     mask: np.ndarray | None,
     reduce_endpoint_weights: bool = True
 ) -> np.ndarray:
+    """
+    Get the average differences between adjacent elements in the array.
+
+    Parameters
+    ----------
+    x: np.ndarray
+        Array to get the average differences between adjacent elements of.
+    mask: np.ndarray | None
+        Mask to apply to the array.
+    reduce_endpoint_weights: bool = True
+        Whether to reduce the weights of the endpoints. Weights of endpoints
+        are reduced by a factor of 2 if True (since only 1 adjacent element).
+
+    Returns
+    -------
+    np.ndarray
+        The average differences between adjacent elements of the array.
+    """
     diffs = np.diff(x)
     av_diffs = np.zeros_like(x)
     av_diffs[1:] += diffs / 2
@@ -416,7 +612,29 @@ def get_default_bounds(
     x: np.ndarray,
     y: np.ndarray,
     num_of_gaussians: int
-) -> tuple[list[float], list[float]]: # ([h_min * n, μ_min * n, σ_min * n], [h_max * n, μ_max * n, σ_max * n])
+) -> tuple[list[float], list[float]]:
+    """
+    Get the default bounds on parameters for the Gaussian fitting.
+
+    Parameters
+    ----------
+    x: np.ndarray
+        Wavelength (Å).
+    y: np.ndarray
+        Flux.
+    num_of_gaussians: int
+        Number of Gaussians to fit.
+
+    Returns
+    -------
+    tuple[list[float], list[float]]
+        The default bounds on parameters.
+        The first list is the lower bounds, and the second list is the upper bounds.
+        In each list, the first `num_of_gaussians` elements are the height bounds,
+        the next `num_of_gaussians` elements are the mu bounds, and the last
+        `num_of_gaussians` elements are the sigma bounds. i.e.
+        `[h_min * n, μ_min * n, σ_min * n], [h_max * n, μ_max * n, σ_max * n]`
+    """
     height_min = const.HEIGHT_MIN
     height_max = 2 * np.max(y)
     x_range = x[-1] - x[0]
@@ -438,6 +656,23 @@ def get_default_bounds(
     return lower_bounds, upper_bounds
 
 def make_row(values, widths, alignments):
+    """
+    Make a row of a table in :func:`pretty_print_flux_comparison`.
+
+    Parameters
+    ----------
+    values: list[str]
+        The values to make the row of.
+    widths: list[int]
+        The widths of the columns.
+    alignments: list[str]
+        The alignments of the columns.
+
+    Returns
+    -------
+    str
+        The row of the table as a string.
+    """
     parts = []
     for val, w, align in zip(values, widths, alignments):
         if align == "center":
@@ -461,7 +696,37 @@ def pretty_print_flux_comparison(
     flux_beta_22: float,
     flux_beta_22_err: float,
     num_gaussians_beta_22: int
-) -> str:
+) -> None:
+    """
+    Pretty print the flux comparison of the photometric flux against the integrated spectroscopic flux for each survey.
+
+    Parameters
+    ----------
+    flux_alpha_21: float
+        The integrated spectroscopic flux for the Hα line in 2021.
+    flux_alpha_21_err: float
+        The error on the integrated spectroscopic flux for the Hα line in 2021.
+    num_gaussians_alpha_21: int
+        The number of Gaussians used to integrate the Hα line in 2021.
+    flux_alpha_22: float
+        The integrated spectroscopic flux for the Hα line in 2022.
+    flux_alpha_22_err: float
+        The error on the integrated spectroscopic flux for the Hα line in 2022.
+    num_gaussians_alpha_22: int
+        The number of Gaussians used to integrate the Hα line in 2022.
+    flux_beta_21: float
+        The integrated spectroscopic flux for the Hβ line in 2021.
+    flux_beta_21_err: float
+        The error on the integrated spectroscopic flux for the Hβ line in 2021.
+    num_gaussians_beta_21: int
+        The number of Gaussians used to integrate the Hβ line in 2022.
+    flux_beta_22: float
+        The integrated spectroscopic flux for the Hβ line in 2022.
+    flux_beta_22_err: float
+        The error on the integrated spectroscopic flux for the Hβ line in 2022.
+    num_gaussians_beta_22: int
+        The number of Gaussians used to integrate the Hβ line in 2022.
+    """
 
     flux_alpha_asassn_g_21_mjy = convert_flux_to_mJy(flux_beta_21, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
     flux_alpha_asassn_g_21_mjy_err = convert_flux_to_mJy(flux_beta_21_err, const.ASASSN_G_BAND_WIDTH, const.ASASSN_G_BAND_LAM)
@@ -584,9 +849,20 @@ def pretty_print_flux_comparison(
 def get_fwhm(
     x: np.ndarray, y_gaussian: np.ndarray,
     get_vel: bool = True,
-    lam_centre_rest_frame: float | None = None,
-    lam_left_right_are_rest_frame: bool = False
+    lam_centre: float | None = None
 ) -> float:
+    """
+    Get the full width at half maximum (FWHM) of a Gaussian-like array.
+
+    Parameters
+    ----------
+    x: np.ndarray
+        Wavelength (Å).
+    y_gaussian: np.ndarray
+        Gaussian-like array.
+    get_vel: bool = True
+        Whether to get the FWHM in velocity (km/s) or wavelength (Å).
+    """
     half_max = np.nanmax(y_gaussian) / 2
     above_half = np.where(y_gaussian >= half_max)[0]
     if len(above_half) < 2:
@@ -596,25 +872,19 @@ def get_fwhm(
     fwhm_ang = lam_right - lam_left
     if get_vel is False:
         return fwhm_ang
-    if lam_centre_rest_frame is None:
-        lam_centre_rest_frame = ((lam_right + lam_left) / 2) / (1 + const.Z_SPEC)
+    if lam_centre is None:
+        lam_centre = (lam_right + lam_left) / 2
     #TD: remove testing
-    # lcrf_option_1 = (x[np.argmax(y_gaussian)]) / (1 + Z_SPEC)
-    # lcrf_option_2 = ((lam_right + lam_left) / 2) / (1 + Z_SPEC)
-    # lcrf_option_3 = (x[(above_half[0] + above_half[-1]) // 2]) / (1 + Z_SPEC)
-    # print(f"Hα: {H_ALPHA}, Hβ: {H_BETA}")
-    # print(f"x[argmax(y)]: {lcrf_option_1}")
-    # print(f"average lam of lam_left and lam_right: {lcrf_option_2}")
-    # print(f"average index of lam_left and lam_right: {lcrf_option_3}")
+    # lam_centre_option_1 = (x[np.argmax(y_gaussian)])
+    # lam_centre_option_2 = ((lam_right + lam_left) / 2)
+    # lam_centre_option_3 = (x[(above_half[0] + above_half[-1]) // 2])
+    # print(f"Hα: {const.H_ALPHA}, Hβ: {const.H_BETA}")
+    # print(f"x[argmax(y)]: {lam_centre_option_1}")
+    # print(f"average lam of lam_left and lam_right: {lam_centre_option_2}")
+    # print(f"average index of lam_left and lam_right: {lam_centre_option_3}")
     #
-    vel_left = convert_lam_to_vel(
-        lam_left, lam_centre_rest_frame,
-        lam_is_rest_frame = lam_left_right_are_rest_frame
-    )
-    vel_right = convert_lam_to_vel(
-        lam_right, lam_centre_rest_frame,
-        lam_is_rest_frame = lam_left_right_are_rest_frame
-    )
+    vel_left = convert_lam_to_vel(lam_left, lam_centre)
+    vel_right = convert_lam_to_vel(lam_right, lam_centre)
     fwhm_vel = vel_right - vel_left
     return fwhm_vel
 
@@ -632,6 +902,39 @@ def compare_yasmeen_results(
     bh_mass_15: tuple[float, float] | None = None,
     bh_mass_21: tuple[float, float] | None = None
 ) -> None:
+    """
+    Compare the results of the YASMEEN code with the results of the SSP code,
+    including the Balmer decrement, BH mass, FWHM, flux, and luminosity of 2015
+    and 2021 Hα and Hβ.
+
+    Parameters
+    ----------
+    fwhm_alpha_15: tuple[float, float] | None = None
+        The FWHM of the Hα line in 2015.
+    fwhm_alpha_21: tuple[float, float] | None = None
+        The FWHM of the Hα line in 2021.
+    fwhm_beta_15: tuple[float, float] | None = None
+        The FWHM of the Hβ line in 2015.
+    fwhm_beta_21: tuple[float, float] | None = None
+        The FWHM of the Hβ line in 2021.
+    flux_alpha_15: tuple[float, float] | None = None
+        The flux of the Hα line in 2015.
+    flux_alpha_21: tuple[float, float] | None = None
+        The flux of the Hα line in 2021.
+    luminosity_alpha_15: tuple[float, float] | None = None
+        The luminosity of the Hα line in 2015.
+    luminosity_alpha_21: tuple[float, float] | None = None
+        The luminosity of the Hα line in 2021.
+    bd_15: tuple[float, float] | None = None
+        The Balmer decrement of the Hα line in 2015.
+    bd_21: tuple[float, float] | None = None
+        The Balmer decrement of the Hα line in 2021.
+    bh_mass_15: tuple[float, float] | None = None
+        The BH mass of the Hα line in 2015.
+    bh_mass_21: tuple[float, float] | None = None
+        The BH mass of the Hα line in 2021.
+    """
+
     all_results = {
         "FWHM Hα 2015 (km/s)": (fwhm_alpha_15, const.YASMEEN_RESULTS["fwhm_alpha_15"]),
         "FWHM Hα 2021 (km/s)": (fwhm_alpha_21, const.YASMEEN_RESULTS["fwhm_alpha_21"]),
@@ -675,6 +978,25 @@ def get_new_qso_filename(
     end: str = ".fits",
     folder_name: str = "pyqsofit_code/data/"
 ) -> str:
+    """
+    Get a new filename for the QSOFIT fits file.
+
+    Parameters
+    ----------
+    filename: str = "qsopar0.fits"
+        The filename of the QSOFIT fits file.
+    start: str = "qsopar"
+        The start of the filename.
+    end: str = ".fits"
+        The end of the filename.
+    folder_name: str = "pyqsofit_code/data/"
+        The folder name of the QSOFIT fits file.
+
+    Returns
+    -------
+    str
+        The new filename for the QSOFIT fits file.
+    """
     if not (filename.startswith(start) and filename.endswith(end)):
         raise ValueError(f"Filename must start with '{start}' and end with '{end}'")
     num_str = filename[len(start) : -len(end)]
@@ -690,10 +1012,25 @@ def get_new_qso_filename(
     #     new_num += 1
     return f"{start}{new_num}{end}"
 
-def get_output_file_name(
+def get_output_pyqsofit_file_name(
     fname: str, # without extension
     folder_name: str = "pyqsofit_code/output/",
 ) -> str:
+    """
+    Get the output filename for the QSOFIT code.
+
+    Parameters
+    ----------
+    fname: str
+        The filename of the spectrum data.
+    folder_name: str = "pyqsofit_code/output/"
+        The folder name of the output files.
+
+    Returns
+    -------
+    str
+        The output filename for the QSOFIT code.
+    """
     if fname == const.FNAME_2001:
         output_name = "SDSS_2001"
     elif fname == const.FNAME_2021:
@@ -723,6 +1060,16 @@ def log_kwargs(
     kwargs: dict,
     log_name: str = "pyqsofit_code/log.csv"
 ) -> None:
+    """
+    Log the keyword arguments of a PyQSOFit run to a CSV file.
+
+    Parameters
+    ----------
+    kwargs: dict
+        The keyword arguments to log.
+    log_name: str = "pyqsofit_code/log.csv"
+        The name of the log file.
+    """
     with open(log_name, "a") as f:
         two_write = ""
         for val in kwargs.values():
@@ -733,7 +1080,25 @@ def get_kwargs_from_log(
     output_file_name: str,
     log_name: str = "pyqsofit_code/log.csv",
     exclude_log_items: bool = True
-) -> dict:
+) -> dict[str, Any]:
+    """
+    Get the keyword arguments from the log file of a PyQSOFit run.
+
+    Parameters
+    ----------
+    output_file_name: str
+        The output filename of the PyQSOFit run.
+    log_name: str = "pyqsofit_code/log.csv"
+        The name of the corresponding log file.
+    exclude_log_items: bool = True
+        Whether to exclude additional parameters that are shown in the
+        log file but are not passed to the actual PyQSOFit call.
+
+    Returns
+    -------
+    dict[str, Any]
+        The keyword arguments from the log file.
+    """
     with open(log_name, "r") as f:
         keys = f.readline().strip().split(";")
         if keys != const.COMBINED_KEYS:
@@ -764,46 +1129,6 @@ def get_kwargs_from_log(
                     vals.append(val)
                 return dict(zip(new_keys, vals))
 
-# def get_scaled_y_bounds(
-#     ax1_y_bounds: tuple[float, float],
-#     ax2_y_bounds: tuple[float | None, float | None],
-#     y1_ref: float,
-#     y2_ref: float,
-# ) -> tuple[float, float]:
-#     y1_min, y1_max = ax1_y_bounds
-#     y2_min, y2_max = ax2_y_bounds
-
-#     y1_range = y1_max - y1_min
-#     if y1_range == 0:
-#         raise ValueError("ax1_y_bounds has zero range")
-
-#     f = (y1_ref - y1_min) / y1_range
-
-#     if y2_min is None and y2_max is None:
-#         raise ValueError("Only one of ax2_y_bounds can be None")
-
-#     if y2_min is None:
-#         # solve for y2_min
-#         # (y2_ref - y2_min) / (y2_max - y2_min) = f
-#         # y2_ref - y2_min = f*(y2_max - y2_min)
-#         # y2_ref - y2_min = f*y2_max - f*y2_min
-#         # y2_ref - f*y2_max = y2_min*(1 - f)
-#         if f == 1:
-#             raise ValueError("f=1 implies y2_min is undefined")
-#         y2_min = (y2_ref - f * y2_max) / (1 - f)
-#         return y2_min, y2_max
-
-#     if y2_max is None:
-#         # solve for y2_max
-#         # (y2_ref - y2_min) / (y2_max - y2_min) = f
-#         # y2_ref - y2_min = f*y2_max - f*y2_min
-#         # y2_ref + y2_min*(f - 1) = f*y2_max
-#         if f == 0:
-#             raise ValueError("f=0 implies y2_max is undefined")
-#         y2_max = (y2_ref + y2_min * (f - 1)) / f
-#         return y2_min, y2_max
-
-#     raise ValueError("One of ax2_y_bounds must be None")
 
 
 def get_scaled_y_bounds(
@@ -815,6 +1140,32 @@ def get_scaled_y_bounds(
     y_val_line_up: float = 0.0,
     y_top_scale_factor: float = 1.25
 ) -> tuple[tuple[float, float], tuple[float, float]]:
+    """
+    Get the scaled y bounds for two axes.
+
+    Parameters
+    ----------
+    y1: np.ndarray | None = None
+        The y values of the first axis.
+    y2: np.ndarray | None = None
+        The y values of the second axis.
+    ax1_y_bounds: tuple[float, float] | None = None
+        The y bounds of the first axis.
+    ax2_y_bounds: tuple[float | None, float | None] | None = None
+        The y bounds of the second axis.
+    fix_y2_top: bool = True
+        Whether to keep the top of the second axis constant.
+    y_val_line_up: float = 0.0
+        The y value that will line up on both axes.
+    y_top_scale_factor: float = 1.25
+        The factor that the max of y2 will be scaled by to create
+        the top of the second axis.
+
+    Returns
+    -------
+    tuple[tuple[float, float], tuple[float | None, float | None]]
+        The y bounds of the first and second axes.
+    """
     if ax1_y_bounds is None:
         if y1 is None:
             raise ValueError("y1 must be provided if ax1_y_bounds is None")
@@ -846,7 +1197,3 @@ def get_scaled_y_bounds(
         return ax1_y_bounds, (ax2_y_bounds[0], ax2_high)
     else:
         raise ValueError("One of ax2_y_bounds must be None")
-
-
-def mpl_font_for_latex_9pt(fig_width_in, col_width_in=3.463, target_pt=9):
-    return target_pt * fig_width_in / col_width_in

@@ -74,9 +74,9 @@ def plot_min_res(
     lam15_blue: np.ndarray,
     lam15_red: np.ndarray,
     res_min: np.ndarray,
-    res_01: np.ndarray,
-    res_21: np.ndarray,
-    res_22: np.ndarray,
+    res01: np.ndarray,
+    res21: np.ndarray,
+    res22: np.ndarray,
     plot_RES_15_RED: bool = False,
     save_fig_name: str | None = "min_res.pdf"
 ) -> None:
@@ -91,13 +91,13 @@ def plot_min_res(
 
     if plot_RES_15_RED:
         res_plot_bounds = [np.min(res_min), max(
-            np.max(res_21), np.max(res_22), 
-            np.max(res_01), const.RES_15_BLUE, const.RES_15_RED
+            np.max(res21), np.max(res22), 
+            np.max(res01), const.RES_15_BLUE, const.RES_15_RED
         )]
     else:
         res_plot_bounds = [np.min(res_min), max(
-            np.max(res_21), np.max(res_22), 
-            np.max(res_01), const.RES_15_BLUE
+            np.max(res21), np.max(res22), 
+            np.max(res01), const.RES_15_BLUE
         )]
     lam_plot_range = np.max(lam_sdss) - lam15_blue_min
     axhline_end = (lam15_blue_max - lam15_blue_min) / lam_plot_range
@@ -109,9 +109,9 @@ def plot_min_res(
     )
     if plot_RES_15_RED:
         plt.axhline(const.RES_15_RED, color='red', linestyle='--', label="SAMI red")
-    plt.plot(lam_sdss, res_21, alpha=0.5, label="2021")
-    plt.plot(lam_sdss, res_22, alpha=0.5, label="2022")
-    plt.plot(lam_sdss, res_01, alpha=0.5, label="SDSS Average")
+    plt.plot(lam_sdss, res01, alpha=0.5, label="2001")
+    plt.plot(lam_sdss, res21, alpha=0.5, label="2021")
+    plt.plot(lam_sdss, res22, alpha=0.5, label="2022")
     plt.plot(lam_sdss, res_min, color='black', alpha=0.5, lw=4, linestyle='--', label="Minimum")
     plt.fill_betweenx(res_plot_bounds, lam15_blue_min, lam15_blue_max, color='lightblue', alpha=0.5, label="SAMI blue coverage")
     plt.fill_betweenx(res_plot_bounds, lam15_red_min, lam15_red_max, color='red', alpha=0.2, label="SAMI red coverage")
@@ -139,7 +139,7 @@ def plot_spectra(
     flux22_err: np.ndarray | None = None,
     title: str | None = None,
     y_axis_label: str = const.SFD_Y_AX_LABEL,
-    x_axis_label: str = const.OBS_ANG_LABEL,
+    x_axis_label: str = const.REST_ANG_LABEL,
     error_opacity: float = const.ERR_OPAC,
     ions: dict[str, float] | None = None,
     x_bounds: tuple[float, float] | None = None,
@@ -250,7 +250,7 @@ def plot_polynomial_ratio(
         plt.plot(binned_lambdas, polynom_vals, color='red', label=poly_label, lw=2*const.LINEWIDTH)
 
     plt.plot(lambdas, vals, alpha=0.4, color='black', label=ratio_label, lw = 0.5*const.LINEWIDTH)
-    plt.xlabel(const.OBS_ANG_LABEL)
+    plt.xlabel(const.REST_ANG_LABEL)
     plt.ylabel("Ratio")
     if const.PLOT_TITLES:
         plt.title(title)
@@ -276,7 +276,7 @@ def plot_adjusted_spectrum(
     plt.plot(lam, baseline_flux, color='black', label=f'{baseline_year}', lw = 0.7*const.LINEWIDTH)
     plt.plot(lam, unadjusted_flux, color='orange', label=f'{year_to_adjust}', lw = 0.7*const.LINEWIDTH)
     plt.plot(adjusted_lam, adjusted_flux, color='red', label=f'{year_to_adjust} (polynomial fit to {baseline_year})', lw = 0.7*const.LINEWIDTH)
-    plt.xlabel(const.OBS_ANG_LABEL)
+    plt.xlabel(const.REST_ANG_LABEL)
     plt.ylabel(const.SFD_Y_AX_LABEL)
 
     plot_vert_emission_lines(ions, lam_bounds)
@@ -335,7 +335,7 @@ def plot_diff_spectra_one_fig(
         if isinstance(plot_centres, list):
             raise ValueError("plot_centres must be a single number if use_ang_x_axis is True")
 
-        x_axis_label = const.OBS_ANG_LABEL
+        x_axis_label = const.REST_ANG_LABEL
         x_15, x_21, x_22 = [lam], [lam], [lam]
         diffs_15 = [diff_15] if diff_15 is not None else None
         diffs_21 = [diff_21] if diff_21 is not None else None
@@ -695,7 +695,7 @@ def old_plot_diff_spectra(
         if isinstance(plot_centres, list):
             raise ValueError("plot_centres must be a single number if use_ang_x_axis is True")
 
-        x_axis_label = const.OBS_ANG_LABEL
+        x_axis_label = const.REST_ANG_LABEL
         x_15, x_21, x_22 = [lam], [lam], [lam]
         diffs_15 = [diff_15] if diff_15 is not None else None
         diffs_21 = [diff_21] if diff_21 is not None else None
