@@ -27,7 +27,7 @@ def get_diff_spectra(
             )
         else:
             raise NotImplementedError("SAMI data must be 3 or 4 arc-seconds")
-        lam = data[0]
+        lam = data["lam"]
         _, adjusted_01_flux_15, adjusted_01_err_15, last_valid_lam_idx_01 = apply_poly_fit(
             data=data, year_to_adjust=2001, 
             plot_ratio_selection=False, plot_poly_ratio=False, plot_adjusted=False,

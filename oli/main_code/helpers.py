@@ -38,6 +38,78 @@ from . import constants as const
 #     else:
 #         raise ValueError("No resolution data provided")
 
+def combine_sami_vals(
+    blue_vals: list[np.ndarray],
+    red_vals: list[np.ndarray],
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Combine the blue and red SAMI values after resampling.
+
+    Parameters
+    ----------
+    blue_vals: list[np.ndarray]
+        The blue SAMI flux, error, and/or FWHM per pixel resolution arrays.
+    red_vals: list[np.ndarray]
+        The red SAMI flux, error, and/or FWHM per pixel resolution arrays.
+
+    Returns
+    -------
+    tuple[np.ndarray]
+        The combined SAMI values.
+    """
+    combined_vals = []
+    for blue_val, red_val in zip(blue_vals, red_vals):
+        combined_val = np.fmax(blue_val, red_val)
+        if (
+            np.sum(np.isfinite(blue_val)) +
+            np.sum(np.isfinite(red_val)) !=
+            np.sum(np.isfinite(combined_val))
+        ):
+            raise ValueError("ERROR: mismatch in number of non-nan values")
+        combined_vals.append(combined_val)
+    return tuple(combined_vals)
+
+def get_good_mask(
+    flux: np.ndarray,
+    err: np.ndarray
+) -> np.ndarray:
+    """
+    Get the mask for finite flux and error pixels. Note: input
+    arrays must have the same length.
+
+    Parameters
+    ----------
+    flux: np.ndarray
+        Flux.
+    err: np.ndarray
+        Error.
+
+    Returns
+    -------
+    np.ndarray
+        The mask for finite flux and error pixels.
+    """
+    return np.isfinite(flux) & np.isfinite(err)
+
+def get_velscale(
+    lam: np.ndarray,
+) -> float:
+    """
+    Get the velocity scale.
+
+    Parameters
+    ----------
+    lam: np.ndarray
+        Wavelength array (Å). Must have log spacing (Default for SDSS.
+        Use :func:`util.log_rebin` to get log spacing for SAMI spectra).
+
+    Returns
+    -------
+    float
+        The velocity scale (km/s).
+    """
+    return const.C_KM_S * np.diff(np.log(lam[[0, -1]]))/(len(lam) - 1)
+
 def remove_or_replace_bad_values(
     lam: np.ndarray,
     flux: np.ndarray,
@@ -48,6 +120,8 @@ def remove_or_replace_bad_values(
     rm_or_replace_other_bad_values: bool | float = np.nan,
 ) -> dict[str, np.ndarray]:
     """
+    Remove or replace values outside the wavelength bounds or other
+    non finite values.
 
     Parameters
     ----------

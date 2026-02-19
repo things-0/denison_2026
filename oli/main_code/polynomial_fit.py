@@ -53,7 +53,7 @@ def get_polynom_fit(
     return polynom, polynom_vals
 
 def apply_poly_fit(
-    data: tuple[np.ndarray, tuple[tuple[np.ndarray, np.ndarray]]] | None = None,
+    data: dict[str, dict[str, np.ndarray]] | None = None,
     year_to_adjust: int = 2022,
     baseline_year: int = 2015,
     lambdas_to_ignore_width: float = const.VEL_TO_IGNORE_WIDTH,
@@ -68,7 +68,8 @@ def apply_poly_fit(
     adjusted_flux_y_bounds: tuple[float] | None = None,
     # adjusted_err_y_bounds: tuple[float] | None = None, #TD: remove?
     ions: dict[str, float] | None = None,
-    blur_before_resampling: bool = True,
+    blur_step: int = 1,
+    resample_step: int = 2,
     extrapolate_beyond_max_baseline_lam: bool = False,
 ) -> tuple[np.poly1d | None, np.ndarray, np.ndarray]:
     possible_years = [2001, 2015, 2021, 2022]
@@ -77,20 +78,27 @@ def apply_poly_fit(
 
     data = get_adjusted_data(
         plot_resampled_and_blurred=False, 
-        blur_before_resampling=blur_before_resampling
+        blur_step=blur_step,
+        resample_step=resample_step,
     ) if data is None else data
 
-    lam, (data01, data15, data21, data22) = data
+    # lam, (data01, data15, data21, data22) = data
 
-    data_map = {
-        2022: data22,
-        2021: data21,
-        2015: data15,
-        2001: data01
-    }
+    # data_map = {
+    #     2022: data22,
+    #     2021: data21,
+    #     2015: data15,
+    #     2001: data01
+    # }
 
-    flux, err = data_map.get(year_to_adjust)
-    baseline_flux, baseline_err = data_map.get(baseline_year)
+    # flux, err = data_map.get(year_to_adjust)
+    # baseline_flux, baseline_err = data_map.get(baseline_year)
+
+    lam = data["lam"]
+    flux = data[f"{year_to_adjust}"]["flux"]
+    err = data[f"{year_to_adjust}"]["flux_err"]
+    baseline_flux = data[f"{baseline_year}"]["flux"]
+    # baseline_err = data[f"{baseline_year}"]["flux_err"]
 
     if year_to_adjust == baseline_year:
         if extrapolate_beyond_max_baseline_lam:

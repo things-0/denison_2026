@@ -7,8 +7,10 @@ def clip_sami_blue_edge(
     unclipped_sami_flux: np.ndarray,
     unclipped_sami_lam: np.ndarray,
     unclipped_sami_err: np.ndarray,
-    min_ssd_lam: float
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    min_ssd_lam: float,
+    fwhm15_blue: np.ndarray | None,
+    good_mask15_blue: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None]:
     """
     Clip the SAMI blue edge to the minimum SDSS wavelength.
 
@@ -22,15 +24,19 @@ def clip_sami_blue_edge(
         The error on the flux of the blue SAMI spectrum.
     min_ssd_lam: float
         The minimum wavelength of the SDSS spectrum.
+    good_mask15_blue: np.ndarray | None
+        The mask the blue SAMI spectrum representing good pixels.
 
     Returns
     -------
-    clipped_sami_flux: np.ndarray
-        The flux of the clipped blue SAMI spectrum.
     clipped_sami_lam: np.ndarray
-        The wavelength of the clipped blue SAMI spectrum.
+        The clipped wavelength array.
+    clipped_sami_flux: np.ndarray
+        The clipped flux array.
     clipped_sami_err: np.ndarray
-        The error on the flux of the clipped blue SAMI spectrum.
+        The clipped error array.
+    clipped_good_mask15_blue: np.ndarray | None
+        The clipped good pixels mask.
     """
     # Find the index of the first wavelength greater than min_ssd_lam
     clip_idx = np.where(unclipped_sami_lam > min_ssd_lam)[0][0]
@@ -39,8 +45,9 @@ def clip_sami_blue_edge(
     clipped_sami_flux = unclipped_sami_flux[clip_idx:]
     clipped_sami_lam = unclipped_sami_lam[clip_idx:]
     clipped_sami_err = unclipped_sami_err[clip_idx:]
+    clipped_good_mask15_blue = good_mask15_blue[clip_idx:] if good_mask15_blue is not None else None
 
-    return clipped_sami_flux, clipped_sami_lam, clipped_sami_err
+    return clipped_sami_lam, clipped_sami_flux, clipped_sami_err, clipped_good_mask15_blue
 
 
 def gaussian_blur_before_resampling(
@@ -50,7 +57,7 @@ def gaussian_blur_before_resampling(
     lam_high_res: np.ndarray,
     flux_high_res: np.ndarray,
     n_chunks: int = 100
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Gaussian blur using resolving power R = λ/FWHM_resolution.
     Blurs high_res spectrum to match low_res spectrum.
@@ -75,12 +82,18 @@ def gaussian_blur_before_resampling(
     -------
     blurred: np.ndarray
         The blurred high-resolution spectrum.
+    new_fwhm_high_res: np.ndarray
+        The new FWHM of the high-resolution spectrum, which now (approximately)
+        matches that of the low-resolution spectrum.
     """
     # Compute sigma arrays on their native grids
     fwhm_low_res = lam_low_res / low_resolving_power
     fwhm_high_res = lam_high_res / high_resolving_power
     sigma_low_res_arr = fwhm_low_res / const.SIGMA_TO_FWHM
     sigma_high_res_arr = fwhm_high_res / const.SIGMA_TO_FWHM
+
+    new_sigma_high_res = np.full_like(sigma_high_res_arr, np.nan)
+    
 
     #TD: remove testing
     n_smoothed = 0
@@ -145,19 +158,29 @@ def gaussian_blur_before_resampling(
                 sigma_pix = np.sqrt(sigma_kernel_sq) / wavelength_step
                 temp_blurred = gaussian_filter1d(flux_high_res, sigma=sigma_pix)
                 blurred[high_res_chunk_start_idx:high_res_chunk_end_idx] = temp_blurred[high_res_chunk_start_idx:high_res_chunk_end_idx]
+                new_fwhm_high_res[high_res_chunk_start_idx:high_res_chunk_end_idx] = sigma_pix
             #TD: remove testing
             else:
                 # print(f"too small sigma_kernel_sq: {sigma_kernel_sq}")
                 # print(f"\tNo blurring applied in chunk {i+1}", flush=True)
+                new_fwhm_high_res[high_res_chunk_start_idx:high_res_chunk_end_idx] = fwhm_high_res[high_res_chunk_start_idx:high_res_chunk_end_idx]
                 n_ignored += 1
             #
         else:
             raise ValueError("No low_res coverage in this chunk. This should never happen.")
     
+    if np.any(~np.isfinite(new_sigma_high_res)):
+        raise ValueError("ERROR: new_sigma_high_res contains non-finite values")
+    new_fwhm_high_res = new_sigma_high_res * const.SIGMA_TO_FWHM
     #TD: remove testing
     # print(f"n_smoothed: {n_smoothed}, n_ignored: {n_ignored}")
+    print(f"fwhm_low_res: {fwhm_high_res}")
+    print(f"old fwhm_high_res: {fwhm_high_res}")
+    print(f"new_fwhm_high_res: {new_fwhm_high_res}")
+    print(f"new 'high' res - old high res: {new_fwhm_high_res - fwhm_high_res}") # should be greater than 0 (decreasing resolving power increases FWHM values)
+    print(f"new 'high' res - old low res: {new_fwhm_high_res - fwhm_low_res}") # should be close to 0
     #
-    return blurred
+    return blurred, new_fwhm_high_res
 
 def gaussian_blur_after_resampling(
     low_resolving_power: np.ndarray | float, 
@@ -165,7 +188,7 @@ def gaussian_blur_after_resampling(
     lam: np.ndarray,
     flux_high_res: np.ndarray, 
     n_chunks: int = 20
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Gaussian blur using resolution (R = λ/FWHM) arrays.
     Degrades high_res spectrum to match low_res spectrum (or
@@ -197,6 +220,8 @@ def gaussian_blur_after_resampling(
 
     sigma_low_res = fwhm_low_res / const.SIGMA_TO_FWHM
     sigma_high_res = fwhm_high_res / const.SIGMA_TO_FWHM
+
+    new_sigma_high_res = np.full_like(sigma_high_res, np.nan)
     
     # Calculate the kernel sigma needed to convolve high_res to low_res
     # If high_res is already lower resolution, no blurring needed (set to 0)
@@ -216,12 +241,18 @@ def gaussian_blur_after_resampling(
         if sigma_pix > const.EPS:
             temp_blurred = gaussian_filter1d(flux_high_res, sigma=sigma_pix)
             blurred[start:end] = temp_blurred[start:end]
-        # else: keep original flux (already copied above)
+            new_sigma_high_res[start:end] = sigma_pix
+        else: # keep original flux (already copied above)
+            new_sigma_high_res[start:end] = fwhm_high_res[start:end]
     
+    if np.any(~np.isfinite(new_sigma_high_res)):
+        raise ValueError("ERROR: new_sigma_high_res contains non-finite values")
+    new_fwhm_high_res = new_sigma_high_res * const.SIGMA_TO_FWHM
+
     #TD: remove testing
     # plt.plot(lam, flux_high_res)
     # plt.plot(lam, blurred)
     # plt.show()
     #
 
-    return blurred
+    return blurred, new_fwhm_high_res
