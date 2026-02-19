@@ -2,7 +2,7 @@ import numpy as np
 import warnings
 
 from . import constants as const
-from .helpers import convert_vel_to_lam, get_vel_lam_mask, get_masked_diffs
+from .helpers import convert_vel_to_lam, get_lam_mask, get_masked_diffs
 from .gaussian_fitting import fit_gaussians
 
 def integrate_flux(
@@ -35,7 +35,7 @@ def integrate_flux(
             plot_fit=plot_gaussians,
             title=title
         )
-        gaussian_trimmed_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, lam_centre)
+        gaussian_trimmed_mask = get_lam_mask(lam, vel_gaussian_fit_width, lam_centre)
         gaussian_trimmed_lam = lam[gaussian_trimmed_mask]
         new_integrate_width_mask = np.where(
             (gaussian_trimmed_lam > lam_bounds[0]) &
@@ -93,8 +93,8 @@ def calculate_balmer_decrement(
 ) -> tuple[float, float]:
     bin_width = vel_integration_width / num_bins
 
-    gfw_alpha_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, const.H_ALPHA)
-    gfw_beta_mask = get_vel_lam_mask(lam, vel_gaussian_fit_width, const.H_BETA)
+    gfw_alpha_mask = get_lam_mask(lam, vel_gaussian_fit_width, const.H_ALPHA)
+    gfw_beta_mask = get_lam_mask(lam, vel_gaussian_fit_width, const.H_BETA)
 
     if num_gaussians > 0:
         gauss_sfd_diff_alpha_vals, gauss_sfd_diff_alpha_errs, _, _, _, _, _, _ = fit_gaussians(

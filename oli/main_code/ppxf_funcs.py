@@ -12,7 +12,7 @@ import warnings
 
 from . import constants as const
 from .data_reading import get_sdss_data, get_sami_data
-from .helpers import get_vel_lam_mask
+from .helpers import get_lam_mask
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -327,13 +327,13 @@ def fit_agn(
 def get_nl_and_stell_cont(
     infile: str = "ppxf_components",
     infile_suffix: str = "",
-    infile_folder: str = const.PPXF_FOLDER_NAME,
+    infile_path: Path = const.PPXF_DATA_DIR,
     nl_gas_comp_ids: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9],
     data_is_normalised: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
     if infile_suffix != "":
         infile_suffix = "_" + infile_suffix
-    actual_infile = infile_folder + infile + infile_suffix + ".fits"
+    actual_infile = infile_path / (infile + infile_suffix + ".fits")
     with fits.open(actual_infile) as hdul:
         lam = hdul['WAVELENGTH'].data
         nl = np.zeros_like(lam)
@@ -355,14 +355,14 @@ def get_nl_and_stell_cont(
 def get_ha_hb_comps(
     infile: str = "ppxf_components",
     infile_suffix: str = "",
-    infile_folder: str = const.PPXF_FOLDER_NAME,
+    infile_path: Path = const.PPXF_DATA_DIR,
     br_gas_comp_ids: list[int] = [10, 11, 12],
     data_is_normalised: bool = True,
     vel_width: float = const.VEL_WIDTH_GAUSSIAN_FIT
 ) -> tuple[np.ndarray, np.ndarray]:
     if infile_suffix != "":
         infile_suffix = "_" + infile_suffix
-    actual_infile = infile_folder + infile + infile_suffix + ".fits"
+    actual_infile = infile_path / (infile + infile_suffix + ".fits")
     with fits.open(actual_infile) as hdul:
         lam = hdul['WAVELENGTH'].data
 
@@ -383,8 +383,8 @@ def get_ha_hb_comps(
             summed_broad *= medflux
             
     
-    ha_mask = get_vel_lam_mask(lam, vel_width, const.H_ALPHA, lam_is_rest_frame=True)
-    hb_mask = get_vel_lam_mask(lam, vel_width, const.H_BETA, lam_is_rest_frame=True)
+    ha_mask = get_lam_mask(lam, vel_width, const.H_ALPHA, width_is_vel=True)
+    hb_mask = get_lam_mask(lam, vel_width, const.H_BETA, width_is_vel=True)
     ha_broad = np.full_like(lam, np.nan)
     ha_broad[ha_mask] = summed_broad[ha_mask]
     hb_broad = np.full_like(lam, np.nan)
@@ -455,7 +455,7 @@ def plot_fit_comp(
         plt.ylabel('Flux')
         # plt.tight_layout()
     plt.title(f"All Gas components ({in_file_suffix})")
-    plt.legend()
+    plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
     plt.show()
         
     # get the narrow IDs:
@@ -480,7 +480,7 @@ def plot_fit_comp(
     yrange = ymax-ymin
     ymin=0.0
     ax1.set(ylim=[ymin-0.05*yrange,ymax+0.05*yrange]) #, xlim=[6450, 6800])
-    ax1.legend()
+    ax1.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
     
     
     ax2 = fig1.add_subplot(2,1,2)

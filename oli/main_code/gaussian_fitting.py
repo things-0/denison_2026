@@ -8,7 +8,7 @@ from matplotlib.colors import Colormap
 from . import constants as const
 from .helpers import (
     get_fwhm, get_masked_diffs,
-    get_default_bounds, get_vel_lam_mask   
+    get_default_bounds, get_lam_mask   
 )
 from .plotting import plot_gaussians
 
@@ -120,7 +120,7 @@ def fit_gaussians(
             raise ValueError("mask_lam_centre must be provided if mask_vel_width is provided")
         if x_untrimmed.shape != y_untrimmed.shape:
             raise ValueError("x_untrimmed and y_untrimmed must have the same shape")
-        mask = get_vel_lam_mask(x_untrimmed, mask_vel_width, mask_lam_centre)
+        mask = get_lam_mask(x_untrimmed, mask_vel_width, mask_lam_centre)
         x = x_untrimmed[mask]
         y = y_untrimmed[mask]
         y_errs = y_errs_untrimmed[mask] if y_errs_untrimmed is not None else None

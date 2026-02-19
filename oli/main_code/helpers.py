@@ -52,7 +52,7 @@ def remove_or_replace_bad_values(
     Parameters
     ----------
     lam: np.ndarray
-        Wavelength (Å).
+        Wavelength array (Å).
     flux: np.ndarray
         Flux.
     err: np.ndarray
@@ -142,6 +142,12 @@ def get_first_valid_flux(flux: np.ndarray):
     Get the first finite flux value.
     """
     return flux[np.where(np.isfinite(flux))[0][0]]
+
+def get_last_valid_flux(flux: np.ndarray):
+    """
+    Get the last finite flux value.
+    """
+    return flux[np.where(np.isfinite(flux))[0][-1]]
 
 def convert_lam_to_vel(
     lam: np.ndarray | float,
@@ -262,7 +268,7 @@ def convert_to_vel_data(
     Parameters
     ----------
     lam: np.ndarray
-        Wavelength (Å).
+        Wavelength array (Å).
     flux: np.ndarray | None
         Flux.
     flux_err: np.ndarray | None
@@ -323,7 +329,7 @@ def get_radius_from_med(
     Parameters
     ----------
     lam: np.ndarray
-        Wavelength (Å).
+        Wavelength array (Å).
     flux: np.ndarray
         Flux.
     scale_factor: float = 100
@@ -556,7 +562,7 @@ def get_lam_mask( # was get_vel_lam_mask
     Parameters
     ----------
     lam: np.ndarray
-        Wavelength (Å).
+        Wavelength array (Å).
     width: float
         Width of the True mask.
     lam_centre: float
@@ -619,7 +625,7 @@ def get_default_bounds(
     Parameters
     ----------
     x: np.ndarray
-        Wavelength (Å).
+        Wavelength array (Å).
     y: np.ndarray
         Flux.
     num_of_gaussians: int
@@ -857,7 +863,7 @@ def get_fwhm(
     Parameters
     ----------
     x: np.ndarray
-        Wavelength (Å).
+        Wavelength array (Å).
     y_gaussian: np.ndarray
         Gaussian-like array.
     get_vel: bool = True

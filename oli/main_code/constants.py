@@ -9,15 +9,16 @@ Z_LUM = 0.05938
 RA = 133.40525
 DEC = 5153/3000
 
-# Rest frame wavelengths
-OIII_WEAK = 4960.30
-OIII_STRONG = 5008.24
-NII_WEAK = 6549.85
-NII_STRONG = 6585.28
+# Rest frame wavelengths from https://iopscience.iop.org/article/10.1086/321167/fulltext/
+OIII_BLUE = 4960.30
+OIII_RED = 5008.24
+NII_BLUE = 6549.85
+NII_RED = 6585.28
 SII_BLUE = 6718.29
 SII_RED = 6732.67
 H_ALPHA = 6564.61
 H_BETA = 4862.68
+
 
 # Bandpass effective central wavelengths and widths
 
@@ -37,11 +38,6 @@ ASASSN_V_BAND_WIDTH = 889.80
 # https://svo2.cab.inta-csic.es/svo/theory/fps/index.php?id=SLOAN/SDSS.g
 ASASSN_G_BAND_LAM = 4671.78
 ASASSN_G_BAND_WIDTH = 1064.68
-
-"""
-ASAS-SN uses Sloan g-band filters with an effective central
-wavelength of 480.3 nm, and a FWHM of 140.9 nm.
-"""
 
 C_KM_S = 2.99792458e5 # km/s
 C_M_S = 2.99792458e8 # m/s
@@ -105,17 +101,18 @@ SMOOTH_FACTOR = 1.0
 #
 
 # Plotting parameters
-LATEX_SINGLE_TO_DOUBLE_COL_WIDTH_RATIO = 2.05712
-PLOT_TITLES = True
 SAVE_FIGS = False
-FIG_OUTPUT_DIR = "output/"
+PLOT_TITLES = True
+# FIG_OUTPUT_DIR = "output/"
 VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
 LINEWIDTH = 1.5
 FIG_SIZE = (10,6)
 DOUBLE_FIG_SIZE = (18,6)
 TALL_FIG_SIZE = (10, 8)
 TEXT_SCALE_FACTOR = 1.8
+LEGEND_SCALE_FACTOR = 0.8
 TEXT_SIZE = FIG_SIZE[0] * TEXT_SCALE_FACTOR
+LATEX_SINGLE_TO_DOUBLE_COL_WIDTH_RATIO = 2.05712
 DOUBLE_TEXT_SIZE = DOUBLE_FIG_SIZE[0] * TEXT_SCALE_FACTOR / LATEX_SINGLE_TO_DOUBLE_COL_WIDTH_RATIO
 ERR_OPAC = 0.1
 FILL_BETWEEN_OPAC = 0.5
@@ -134,9 +131,9 @@ SDSS_DATA_DIR = SAMI323854_DIR / "sdss_data"
 PPXF_DATA_DIR = DATA_DIR / "ppxf_results"
 
 #TODO: remove
-SAMI_FOLDER_NAME = "data/sami323854/sami_data/"
-SDSS_FOLDER_NAME = "data/sami323854/sdss_data/"
-PPXF_FOLDER_NAME = "data/ppxf_results/"
+# SAMI_FOLDER_NAME = "data/sami323854/sami_data/"
+# SDSS_FOLDER_NAME = "data/sami323854/sdss_data/"
+# PPXF_FOLDER_NAME = "data/ppxf_results/"
 #
 
 FNAME_2001 = "spec-0469-51913-0338.fits"
@@ -162,6 +159,10 @@ SFD_UNITS = FLUX_UNITS + r" ${\mathrm{\AA}}^{-1}$"
 SFD_Y_AX_LABEL = r"$F_{\lambda}$ " + f"({SFD_UNITS})"
 HA_LATEX = r"H$\alpha$"
 HB_LATEX = r"H$\beta$"
+OIII_BLUE_LATEX = r"[OIII]$\lambda$4959"
+OIII_RED_LATEX = r"[OIII]$\lambda$5007"
+SII_BLUE_LATEX = r"[SII]$\lambda$6718"
+SII_RED_LATEX = r"[SII]$\lambda$6733"
 
 # From 2021 "The SAMI Galaxy Survey: the third and final data release"
 """
@@ -172,7 +173,6 @@ spectral resolutions are R = 1808 and 4304 for the blue and red
 arms, equivalent to an effective velocity dispersion of σ of 70.4 and
 29.6 km s^{-1}, respectively
 """
-
 RES_15_BLUE = 1808
 RES_15_RED = 4304
 
@@ -184,13 +184,10 @@ RES_15_RED = 4304
 (Sharp et al. 2006), which for the survey is set up to have resolu-
 tions of R = 1730 in the blue arm and R = 4500 in the red arm.
 """
-
 # R_15_blue = 1730
 # R_15_red = 4500
 
-# Average across all epochs and wavelength ranges
-# SDSS_res = 2000
-
+# PyQSOFit parameters
 FIT_KEYS = [
     "name", "nsmooth", "and_mask", "or_mask", "reject_badpix",
     "deredden", "wave_range", "wave_mask", "decompose_host",

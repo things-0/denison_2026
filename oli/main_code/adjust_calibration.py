@@ -11,6 +11,26 @@ def clip_sami_blue_edge(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Clip the SAMI blue edge to the minimum SDSS wavelength.
+
+    Parameters
+    ----------
+    unclipped_sami_flux: np.ndarray
+        The flux of the blue SAMI spectrum.
+    unclipped_sami_lam: np.ndarray
+        The wavelength of the blue SAMI spectrum.
+    unclipped_sami_err: np.ndarray
+        The error on the flux of the blue SAMI spectrum.
+    min_ssd_lam: float
+        The minimum wavelength of the SDSS spectrum.
+
+    Returns
+    -------
+    clipped_sami_flux: np.ndarray
+        The flux of the clipped blue SAMI spectrum.
+    clipped_sami_lam: np.ndarray
+        The wavelength of the clipped blue SAMI spectrum.
+    clipped_sami_err: np.ndarray
+        The error on the flux of the clipped blue SAMI spectrum.
     """
     # Find the index of the first wavelength greater than min_ssd_lam
     clip_idx = np.where(unclipped_sami_lam > min_ssd_lam)[0][0]
@@ -32,8 +52,29 @@ def gaussian_blur_before_resampling(
     n_chunks: int = 100
 ) -> np.ndarray:
     """
-    Gaussian blur using resolution (R = λ/FWHM) arrays.
-    Degrades high_res spectrum to match low_res spectrum.
+    Gaussian blur using resolving power R = λ/FWHM_resolution.
+    Blurs high_res spectrum to match low_res spectrum.
+
+    Parameters
+    ----------
+    low_resolving_power: np.ndarray | float
+        The resolving power of the low-resolution spectrum.
+    high_resolving_power: np.ndarray | float
+        The resolving power of the high-resolution spectrum.
+    lam_low_res: np.ndarray
+        The wavelength of the low-resolution spectrum.
+    lam_high_res: np.ndarray
+        The wavelength of the high-resolution spectrum.
+    flux_high_res: np.ndarray
+        The flux of the high-resolution spectrum.
+    n_chunks: int = 100
+        The number of chunks to divide the high-resolution spectrum into
+        when blurring.
+
+    Returns
+    -------
+    blurred: np.ndarray
+        The blurred high-resolution spectrum.
     """
     # Compute sigma arrays on their native grids
     fwhm_low_res = lam_low_res / low_resolving_power
@@ -42,8 +83,6 @@ def gaussian_blur_before_resampling(
     sigma_high_res_arr = fwhm_high_res / const.SIGMA_TO_FWHM
 
     #TD: remove testing
-    # diffs = np.diff(lam_high_res)
-    # print(f"Min step: {diffs.min()}, Max step: {diffs.max()}, Std/Mean: {diffs.std()/diffs.mean()}")
     n_smoothed = 0
     n_ignored = 0
     #
@@ -53,7 +92,7 @@ def gaussian_blur_before_resampling(
     
     for i in range(n_chunks):
         high_res_chunk_start_idx = i * chunk_size
-        high_res_chunk_end_idx = (i + 1) * chunk_size if i < n_chunks - 1 else len(lam_high_res)
+        high_res_chunk_end_idx = high_res_chunk_start_idx + chunk_size
         
         # Wavelength range for this chunk (on the high_res grid)
         lam_high_res_chunk = lam_high_res[high_res_chunk_start_idx:high_res_chunk_end_idx]
@@ -63,7 +102,6 @@ def gaussian_blur_before_resampling(
         # Find low_res wavelengths that fall in this range
         low_res_lam_chunk_mask = (lam_low_res >= lam_min) & (lam_low_res <= lam_max)
         
-
 
         if np.any(low_res_lam_chunk_mask):
             # Compute median sigma in this chunk for both spectra
@@ -122,27 +160,40 @@ def gaussian_blur_before_resampling(
     return blurred
 
 def gaussian_blur_after_resampling(
-    low_res: np.ndarray | float, 
-    high_res: np.ndarray | float, 
+    low_resolving_power: np.ndarray | float, 
+    high_resolving_power: np.ndarray | float, 
     lam: np.ndarray,
     flux_high_res: np.ndarray, 
-    wavelength_step: float, 
     n_chunks: int = 20
 ) -> np.ndarray:
     """
     Gaussian blur using resolution (R = λ/FWHM) arrays.
-    Degrades high_res spectrum to match low_res spectrum.
-    
-    Handles the case where high_res <= low_res at some wavelengths
-    (no blurring needed there).
-    """
-    if np.isscalar(low_res):
-        low_res = np.full_like(lam, low_res)
-    if np.isscalar(high_res):
-        high_res = np.full_like(lam, high_res)
+    Degrades high_res spectrum to match low_res spectrum (or
+    leaves as is if high_res <= low_res at particular wavelengths).
 
-    fwhm_low_res = lam / low_res
-    fwhm_high_res = lam / high_res
+    Parameters
+    ----------
+    low_resolving_power: np.ndarray | float
+        The resolving power of the low-resolution spectrum.
+    high_resolving_power: np.ndarray | float
+        The resolving power of the high-resolution spectrum.
+    lam: np.ndarray
+        The wavelength of the spectrum.
+    flux_high_res: np.ndarray
+        The flux of the high-resolution spectrum.
+    n_chunks: int = 20
+        The number of chunks to divide the spectrum into when blurring.
+        Each chunk is blurred according to its median sigma (from resolving power).
+
+    Returns
+    -------
+    blurred: np.ndarray
+        The blurred high-resolution spectrum.
+    """
+    wavelength_step = np.median(np.diff(lam))
+
+    fwhm_low_res = lam / low_resolving_power
+    fwhm_high_res = lam / high_resolving_power
 
     sigma_low_res = fwhm_low_res / const.SIGMA_TO_FWHM
     sigma_high_res = fwhm_high_res / const.SIGMA_TO_FWHM
@@ -158,7 +209,7 @@ def gaussian_blur_after_resampling(
     
     for i in range(n_chunks):
         start = i * chunk_size
-        end = (i + 1) * chunk_size if i < n_chunks - 1 else len(lam)
+        end = start + chunk_size
         
         sigma_pix = np.median(sigma_kernel_arr[start:end]) / wavelength_step
         

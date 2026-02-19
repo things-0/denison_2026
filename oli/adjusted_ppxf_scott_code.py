@@ -569,7 +569,7 @@ def plot_ppxf_fit_comp(
         plt.ylabel('Flux')
         # plt.tight_layout()
     plt.title("All Gas components")
-    plt.legend()
+    plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
     plt.show()
         
     # get the narrow IDs:
@@ -601,7 +601,7 @@ def plot_ppxf_fit_comp(
     yrange = ymax-ymin
     ymin=0.0
     ax1.set(ylim=[ymin-0.05*yrange,ymax+0.05*yrange]) #, xlim=[6450, 6800])
-    ax1.legend()
+    ax1.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
     
     
     ax2 = fig1.add_subplot(2,1,2)
