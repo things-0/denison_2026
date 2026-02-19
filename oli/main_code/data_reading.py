@@ -14,7 +14,7 @@ import warnings
 
 from . import constants as const
 from .adjust_calibration import gaussian_blur_before_resampling, gaussian_blur_after_resampling, clip_sami_blue_edge
-from .helpers import remove_or_replace_bad_values, get_velscale, get_good_mask, combine_sami_vals
+from .helpers import remove_or_replace_bad_values, get_velscale, get_good_pixels, combine_sami_vals
 from .plotting import plot_min_res, plot_spectra
 
 def get_sami_data(
@@ -62,7 +62,7 @@ def get_sami_data(
     -------
     data: dict[str, np.ndarray]
         A dictionary with the keys "lam", "flux", "flux_err", "fwhm_per_pix", "median_flux",
-        "velscale", "good_mask".
+        "velscale", "good_pixels".
     """
     with fits.open(folder_path / file_name) as hdulist:
         header = hdulist["PRIMARY"].header
@@ -179,7 +179,7 @@ def get_sdss_data(
     -------
     data: dict[str, np.ndarray]
         A dictionary with the keys "lam", "flux", "flux_err", "fwhm_per_pix", "median_flux",
-        "velscale", "good_mask".
+        "velscale", "good_pixels".
     """
     with fits.open(folder_path / file_name) as hdulist:
         image_data = hdulist['COADD'].data
@@ -344,18 +344,11 @@ def get_adjusted_data(
 
     Returns
     -------
-    data: tuple[np.ndarray, tuple[
-            np.ndarray, np.ndarray
-        ], tuple[
-            np.ndarray, np.ndarray
-        ], tuple[
-            np.ndarray, np.ndarray
-        ], tuple[
-            np.ndarray, np.ndarray
-        ]
-    ]
-    First array is the wavelength array, the rest are the flux and flux error pairs for
-    each epoch (2001, 2015, 2021, 2022). 
+    data: dict[str, dict[str, np.ndarray]]
+        A dictionary with the keys "2001", "2015" (or "2015_blue" and "2015_red"),
+        "2021", and "2022", each with the keys "lam", "flux", "flux_err", "fwhm_per_pix",
+        "good_pixels", "median_flux", and "velscale", unless these values are the same across
+        all epochs, in which case they exist as key value pairs in the outer dictionary.
     """
     if not {blur_step, resample_step}.issubset({0, 1, 2}):
         raise ValueError("ERROR: blur_step and resample_step must be 0, 1, or 2")
@@ -398,9 +391,9 @@ def get_adjusted_data(
         input_data01["fwhm_per_pix"], input_data15_blue["fwhm_per_pix"],
         input_data15_red["fwhm_per_pix"], input_data21["fwhm_per_pix"], input_data22["fwhm_per_pix"]
     )
-    good_mask01, good_mask15_blue, good_mask15_red, good_mask21, good_mask22 = (
-        input_data01["good_mask"], input_data15_blue["good_mask"],
-        input_data15_red["good_mask"], input_data21["good_mask"], input_data22["good_mask"]
+    good_pixels_01, good_pixels_15_blue, good_pixels_15_red, good_pixels_21, good_pixels_22 = (
+        input_data01["good_pixels"], input_data15_blue["good_pixels"],
+        input_data15_red["good_pixels"], input_data21["good_pixels"], input_data22["good_pixels"]
     )
     median_flux01, median_flux15_blue, median_flux15_red, median_flux21, median_flux22 = (
         input_data01["median_flux"], input_data15_blue["median_flux"],
@@ -468,7 +461,7 @@ def get_adjusted_data(
         "flux": flux01,
         "flux_err": err01,
         "fwhm_per_pix": fwhm01,
-        "good_mask": good_mask01,
+        "good_pixels": good_pixels_01,
         "median_flux": median_flux01,
         "velscale": velscale01
     }
@@ -477,7 +470,7 @@ def get_adjusted_data(
         "flux": flux15_blue,
         "flux_err": err15_blue,
         "fwhm_per_pix": fwhm15_blue,
-        "good_mask": good_mask15_blue,
+        "good_pixels": good_pixels_15_blue,
         "median_flux": median_flux15_blue,
         "velscale": velscale15_blue
     }
@@ -486,7 +479,7 @@ def get_adjusted_data(
         "flux": flux15_red,
         "flux_err": err15_red,
         "fwhm_per_pix": fwhm15_red,
-        "good_mask": good_mask15_red,
+        "good_pixels": good_pixels_15_red,
         "median_flux": median_flux15_red,
         "velscale": velscale15_red
     }
@@ -495,7 +488,7 @@ def get_adjusted_data(
         "flux": flux21,
         "flux_err": err21,
         "fwhm_per_pix": fwhm21,
-        "good_mask": good_mask21,
+        "good_pixels": good_pixels_21,
         "median_flux": median_flux21,
         "velscale": velscale21
     }
@@ -504,7 +497,7 @@ def get_adjusted_data(
         "flux": flux22,
         "flux_err": err22,
         "fwhm_per_pix": fwhm22,
-        "good_mask": good_mask22,
+        "good_pixels": good_pixels_22,
         "median_flux": median_flux22,
         "velscale": velscale22
     }
@@ -523,8 +516,8 @@ def get_adjusted_data(
     if blur_step == 1:
     # if blur_before_resampling:
         min_ssd_lam = np.min(lam01)
-        lam15_blue_clipped, flux15_blue_clipped, err15_blue_clipped, good_mask15_blue_clipped = clip_sami_blue_edge(
-            flux15_blue, lam15_blue, err15_blue, min_ssd_lam, good_mask15_blue # we know fwhm15_blue is not None because RES_15_BLUE was passed in to get_sami_data
+        lam15_blue_clipped, flux15_blue_clipped, err15_blue_clipped, good_pixels_15_blue_clipped = clip_sami_blue_edge(
+            flux15_blue, lam15_blue, err15_blue, min_ssd_lam, good_pixels_15_blue # we know fwhm15_blue is not None because RES_15_BLUE was passed in to get_sami_data
         )
         median_flux15_blue_clipped = np.nanmedian(flux15_blue_clipped)
         velscale15_blue_clipped = get_velscale(lam15_blue_clipped)
@@ -578,7 +571,7 @@ def get_adjusted_data(
             )
                 
         if resample_step == 0:            
-            all_data["2015_blue"]["good_mask"] = good_mask15_blue_clipped
+            all_data["2015_blue"]["good_pixels"] = good_pixels_15_blue_clipped
             all_data["2015_blue"]["median_flux"] = median_flux15_blue_clipped
             all_data["2015_blue"]["velscale"] = velscale15_blue_clipped
             
@@ -632,21 +625,21 @@ def get_adjusted_data(
         all_data["2015"] = {
             "flux": flux15_blurred_resampled,
             "flux_err": err15_resampled,
-            "good_mask": get_good_mask(flux15_blurred_resampled, err15_resampled),
+            "good_pixels": get_good_pixels(flux15_blurred_resampled, err15_resampled),
             "median_flux": np.nanmedian(flux15_blurred_resampled)
         }
 
         all_data["2001"]["flux"] = flux01_blurred_resampled
         all_data["2001"]["flux_err"] = err01_resampled
-        all_data["2001"]["good_mask"] = get_good_mask(flux01_blurred_resampled, err01_resampled)
+        all_data["2001"]["good_pixels"] = get_good_pixels(flux01_blurred_resampled, err01_resampled)
 
         all_data["2021"]["flux"] = flux21_blurred_resampled
         all_data["2021"]["flux_err"] = err21_resampled
-        all_data["2021"]["good_mask"] = get_good_mask(flux21_blurred_resampled, err21_resampled)
+        all_data["2021"]["good_pixels"] = get_good_pixels(flux21_blurred_resampled, err21_resampled)
         
         all_data["2022"]["flux"] = flux22_blurred_resampled
         all_data["2022"]["flux_err"] = err22_resampled
-        all_data["2022"]["good_mask"] = get_good_mask(flux22_blurred_resampled, err22_resampled)
+        all_data["2022"]["good_pixels"] = get_good_pixels(flux22_blurred_resampled, err22_resampled)
 
         resampled_and_blurred_title = "Spectra from 2001 to 2022 (blurred then resampled to 2001 grid)"
 
@@ -705,22 +698,22 @@ def get_adjusted_data(
         all_data["2015"] = {
             "flux": flux15_resampled,
             "flux_err": err15_resampled,
-            "good_mask": get_good_mask(flux15_resampled, err15_resampled),
+            "good_pixels": get_good_pixels(flux15_resampled, err15_resampled),
             "median_flux": np.nanmedian(flux15_resampled)
         }
 
 
         all_data["2001"]["flux"] = flux01_resampled
         all_data["2001"]["flux_err"] = err01_resampled
-        all_data["2001"]["good_mask"] = get_good_mask(flux01_resampled, err01_resampled)
+        all_data["2001"]["good_pixels"] = get_good_pixels(flux01_resampled, err01_resampled)
 
         all_data["2021"]["flux"] = flux21_resampled
         all_data["2021"]["flux_err"] = err21_resampled
-        all_data["2021"]["good_mask"] = get_good_mask(flux21_resampled, err21_resampled)
+        all_data["2021"]["good_pixels"] = get_good_pixels(flux21_resampled, err21_resampled)
         
         all_data["2022"]["flux"] = flux22_resampled
         all_data["2022"]["flux_err"] = err22_resampled
-        all_data["2022"]["good_mask"] = get_good_mask(flux22_resampled, err22_resampled)
+        all_data["2022"]["good_pixels"] = get_good_pixels(flux22_resampled, err22_resampled)
 
         if blur_step == 0:
             fwhm01_resampled = fwhm01
@@ -760,7 +753,15 @@ def get_adjusted_data(
             fwhm01_resampled_blurred, fwhm15_resampled_blurred,
             fwhm21_resampled_blurred, fwhm22_resampled_blurred
         ]:
-            if not np.isclose(fwhm, fwhm01_resampled_blurred):
+            if not np.all(np.isclose(fwhm, fwhm01_resampled_blurred, equal_nan=True)):
+                for f, y in zip(
+                    [fwhm01_resampled_blurred, fwhm15_resampled_blurred,
+                    fwhm21_resampled_blurred, fwhm22_resampled_blurred],
+                    ["2001", "2015", "2021", "2022"]
+                ):
+                    plt.plot(lam01, f, label=y)
+                plt.legend()
+                plt.show()
                 raise ValueError("ERROR: fwhm_per_pix should be all the same after this step")
             data.pop("fwhm_per_pix")
 

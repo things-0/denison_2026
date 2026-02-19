@@ -69,12 +69,12 @@ def combine_sami_vals(
         combined_vals.append(combined_val)
     return tuple(combined_vals)
 
-def get_good_mask(
+def get_good_pixels(
     flux: np.ndarray,
     err: np.ndarray
 ) -> np.ndarray:
     """
-    Get the mask for finite flux and error pixels. Note: input
+    Get the indices of the finite flux and error pixels. Note: input
     arrays must have the same length.
 
     Parameters
@@ -87,9 +87,9 @@ def get_good_mask(
     Returns
     -------
     np.ndarray
-        The mask for finite flux and error pixels.
+        The indices of the finite flux and error pixels.
     """
-    return np.isfinite(flux) & np.isfinite(err)
+    return np.where(np.isfinite(flux) & np.isfinite(err))[0]
 
 def get_velscale(
     lam: np.ndarray,

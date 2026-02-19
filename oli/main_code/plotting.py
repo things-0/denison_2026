@@ -471,14 +471,14 @@ def plot_diff_spectra_one_fig(
 
     if use_ang_x_axis:        
         x_bounds = get_lam_bounds(plot_centres, vel_plot_width, width_is_vel=True) if vel_plot_width is not None else None
-        vel_centre_ang = None
+        lam_centre = None
     else:
-        vel_centre_ang = plot_centres[0] if isinstance(plot_centres, list) else plot_centres
+        lam_centre = plot_centres[0] if isinstance(plot_centres, list) else plot_centres
         x_bounds = (-vel_plot_width / 2, vel_plot_width / 2) if vel_plot_width is not None else None
         
 
     plot_vert_emission_lines(
-        ions, x_bounds, vel_centre_ang=vel_centre_ang,
+        ions, x_bounds, lam_centre=lam_centre,
         fill_between_bounds=fill_between_bounds,
         fill_between_label=fill_between_label,
         fill_between_opacity=fill_between_opacity
