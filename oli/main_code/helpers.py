@@ -225,7 +225,8 @@ def get_last_valid_flux(flux: np.ndarray):
 
 def convert_lam_to_vel(
     lam: np.ndarray | float,
-    lam_centre: float
+    lam_centre: float,
+    approximation: str | None = "log" # useful for SDSS log space wavelengths
 ) -> np.ndarray | float:
     """
     Convert wavelength (Å) to velocity (km/s). 
@@ -236,18 +237,34 @@ def convert_lam_to_vel(
         Wavelength (Å) to convert to velocity (km/s).
     lam_centre: float
         Centre wavelength (Å) of the line (0 km/s).
+    approximation: str | None
+        Approximation to use. None for no approximation, "log" for logarithmic
+        approximation, "linear" for linear approximation.
 
     Returns
     -------
     np.ndarray | float
         Velocity (km/s).
+    
+    Notes
+    ------
+    See https://www.desmos.com/calculator/cmkrq265tt for error visualization.
     """
-    # v = c * Δλ / λ_cent
-    return (lam - lam_centre) * const.C_KM_S / lam_centre
+    if approximation is None or approximation.lower() == "none":
+        sq_term = (lam / lam_centre)**2
+        return const.C_KM_S * (sq_term - 1) / (sq_term + 1)
+    elif approximation == "log":
+        return const.C_KM_S * np.log(lam / lam_centre)
+    elif approximation == "linear":
+        # v = c * Δλ / λ_cent
+        return const.C_KM_S * (lam - lam_centre) / lam_centre
+    else:
+        raise ValueError(f"Invalid approximation: {approximation}")
 
 def convert_vel_to_lam(
     vel: np.ndarray | float,
-    lam_centre: float
+    lam_centre: float,
+    approximation: str | None = "log" # useful for SDSS log space wavelengths
 ) -> np.ndarray | float:
     """
     Convert velocity (km/s) to wavelength (Å).
@@ -258,14 +275,68 @@ def convert_vel_to_lam(
         Velocity (km/s) to convert to wavelength (Å).
     lam_centre: float
         Centre wavelength (Å) of the line (0 km/s).
+    approximation: str | None
+        Approximation to use. None for no approximation, "log" for logarithmic
+        approximation, "linear" for linear approximation.
 
     Returns
     -------
     np.ndarray | float
         Wavelength (Å).
+
+    Notes
+    ------
+    See https://www.desmos.com/calculator/cmkrq265tt for error visualization.
     """
-    # λ = λ_cent * (1 + v / c)
-    return lam_centre * (1 + vel / const.C_KM_S)
+    beta = vel / const.C_KM_S
+    if approximation is None or approximation.lower() == "none":
+        return lam_centre * np.sqrt((1 + beta) / (1 - beta))
+    elif approximation == "log":
+        return lam_centre * np.exp(beta)
+    elif approximation == "linear":
+        # λ = λ_cent * (1 + v / c)
+        return lam_centre * (1 + beta)
+    else:
+        raise ValueError(f"Invalid approximation: {approximation}")
+
+def get_lam_centre(
+    lam: np.ndarray | float,
+    vel: np.ndarray | float,
+    approximation: str | None = "log" # useful for SDSS log space wavelengths
+) -> float:
+    """
+    Get the centre wavelength corresponding to 0 km/s given observed wavelength
+    and velocity.
+
+    Parameters
+    ----------
+    lam: np.ndarray | float
+        Observed wavelength (Å).
+    vel: np.ndarray | float
+        Velocity (km/s).
+    approximation: str | None
+        Approximation to use. None for no approximation, "log" for logarithmic
+        approximation, "linear" for linear approximation.
+
+    Returns
+    -------
+    float
+        Centre wavelength (Å) corresponding to 0 km/s.
+
+    Notes
+    ------
+    See https://www.desmos.com/calculator/cmkrq265tt for error visualization.
+    """
+    beta = vel / const.C_KM_S
+    if approximation is None or approximation.lower() == "none":
+        return lam * np.sqrt((1 - beta) / (1 + beta))
+    elif approximation == "log":
+        return lam * np.exp(-beta)
+    elif approximation == "linear":
+        return lam / (1 + beta)
+    else:
+        raise ValueError(f"Invalid approximation: {approximation}")
+    
 
 def get_lam_bounds(
     lam_centre: float, width: float,

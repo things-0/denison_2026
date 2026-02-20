@@ -7,7 +7,9 @@ from .polynomial_fit import apply_poly_fit
 def get_diff_spectra(
     adjusted_fluxes: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
     return_lam: bool = False,
-    arcsec: int = 3
+    arcsec: int = 3,
+    blur_step: int = 1,
+    resample_step: int = 2,
 ) -> tuple[
     tuple[np.ndarray, np.ndarray, np.ndarray],
     tuple[np.ndarray, np.ndarray, np.ndarray]
@@ -18,12 +20,18 @@ def get_diff_spectra(
 ]:
     if adjusted_fluxes is None:
         if arcsec == 3:
-            data = get_adjusted_data(plot_resampled_and_blurred=False)
+            data = get_adjusted_data(
+                plot_resampled_and_blurred=False,
+                blur_step=blur_step,
+                resample_step=resample_step,
+            )
         elif arcsec == 4:
             data = get_adjusted_data(
                 plot_resampled_and_blurred=False,
                 fname_2015_blue=const.FNAME_2015_BLUE_4_ARCSEC,
-                fname_2015_red=const.FNAME_2015_RED_4_ARCSEC
+                fname_2015_red=const.FNAME_2015_RED_4_ARCSEC,
+                blur_step=blur_step,
+                resample_step=resample_step,
             )
         else:
             raise NotImplementedError("SAMI data must be 3 or 4 arc-seconds")

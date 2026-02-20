@@ -184,6 +184,11 @@ def plot_spectra(
         flux15_blue, flux15_red = flux15
         lam15_blue, lam15_red = lam15
 
+        #TODO: remove testing
+        # lam_of_max_flux = lam15_red[np.nanargmax(flux15_red)]
+        # plt.axvline(lam_of_max_flux, color='coral', alpha=0.3, linestyle='--', label=f'max flux 2015 {lam_of_max_flux:.2f} Å = {np.nanmax(flux15_red):.2f}')
+        #
+
         flux15_blue_os, flux15_red_os = flux15_blue + y_offset, flux15_red + y_offset
         flux15_os = (flux15_blue_os, flux15_red_os)
 
@@ -197,20 +202,26 @@ def plot_spectra(
     plt.plot(lam21, flux21_os, color='red', label='2021 (SDSS)', lw = const.LINEWIDTH)
     plt.plot(lam22, flux22_os, color='blue', label='2022 (SDSS)', lw = const.LINEWIDTH)
 
+    #TODO: remove testing
+    # lam_of_max_flux = lam01[np.nanargmax(flux01)]
+    # plt.axvline(lam_of_max_flux, color='orange', label=f'max flux 2001 {lam_of_max_flux:.2f} Å = {np.nanmax(flux01):.2f}')
+    # plt.axvline(lam_of_max_flux, color='darkgreen', linestyle='--', label=f'old max flux 2001 {6563.45} Å = {87.18}')
+    #
+
     if plot_errors:
         if flux01_err is not None:
-            plt.fill_between(lam01, flux01_os - flux01_err, flux01_os + flux01_err, color='black', alpha=error_opacity)
+            plt.fill_between(lam01, flux01_os - flux01_err, flux01_os + flux01_err, color='green', alpha=error_opacity)
         if flux15_err is not None:
             if sami_is_split:
                 flux15_blue_err, flux15_red_err = flux15_err
-                plt.fill_between(lam15_blue, flux15_blue_os - flux15_blue_err, flux15_blue_os + flux15_blue_err, color='blue', alpha=error_opacity)
-                plt.fill_between(lam15_red, flux15_red_os - flux15_red_err, flux15_red_os + flux15_red_err, color='red', alpha=error_opacity)
+                plt.fill_between(lam15_blue, flux15_blue_os - flux15_blue_err, flux15_blue_os + flux15_blue_err, color='turquoise', alpha=error_opacity)
+                plt.fill_between(lam15_red, flux15_red_os - flux15_red_err, flux15_red_os + flux15_red_err, color='coral', alpha=error_opacity)
             else:
-                plt.fill_between(lam15, flux15_os - flux15_err, flux15_os + flux15_err, color='purple', alpha=error_opacity)
+                plt.fill_between(lam15, flux15_os - flux15_err, flux15_os + flux15_err, color='black', alpha=error_opacity)
         if flux21_err is not None:
-            plt.fill_between(lam21, flux21_os - flux21_err, flux21_os + flux21_err, color='orange', alpha=error_opacity)
+            plt.fill_between(lam21, flux21_os - flux21_err, flux21_os + flux21_err, color='red', alpha=error_opacity)
         if flux22_err is not None:
-            plt.fill_between(lam22, flux22_os - flux22_err, flux22_os + flux22_err, color='green', alpha=error_opacity)
+            plt.fill_between(lam22, flux22_os - flux22_err, flux22_os + flux22_err, color='blue', alpha=error_opacity)
 
     plot_vert_emission_lines(
         ions, plot_x_bounds=x_bounds,

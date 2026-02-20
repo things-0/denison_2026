@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-Z_SPEC = 0.0581892766058445 # for spectroscopy (was 0.0582)
+Z_SPEC = 0.0582
+# Z_SPEC = 0.0581892766058445 # for spectroscopy
 Z_LUM = 0.05938
 
 # From SAMI header
@@ -87,6 +88,7 @@ TEST_NUM_MC_TRIALS = 50
 TOTAL_LAM_BOUNDS = (3900, 8000)
 VEL_TO_IGNORE_WIDTH = 7000
 POLY_FIT_BIN_WIDTH = 50 # angstrom
+VEL_BLUR_BIN_WIDTH = 1500.0 # km/s
 
 # Gaussian fitting parameters
 MAXFEV = 2100 # default is 1600
@@ -121,6 +123,7 @@ ALT_COLOUR_MAP = plt.cm.tab20
 FIG_LAYOUT = "constrained"
 
 VEL_WIDTH_GAUSSIAN_FIT = VEL_PLOT_WIDTH
+
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = ROOT_DIR / "output"

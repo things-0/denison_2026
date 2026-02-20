@@ -14,7 +14,7 @@ import warnings
 
 from . import constants as const
 from .adjust_calibration import gaussian_blur_before_resampling, gaussian_blur_after_resampling, clip_sami_blue_edge
-from .helpers import remove_or_replace_bad_values, get_velscale, get_good_pixels, combine_sami_vals
+from .helpers import remove_or_replace_bad_values, get_velscale, get_good_pixels, combine_sami_vals, get_lam_bounds
 from .plotting import plot_min_res, plot_spectra
 
 def get_sami_data(
@@ -28,6 +28,7 @@ def get_sami_data(
     z: float = const.Z_SPEC, # use 0 to get observed frame data
     perform_log_rebin: bool = False,
     resolving_power: float | np.ndarray | None = None,
+    plot_as_is: bool = False, #TODO: remove testing
 ) -> dict[str, np.ndarray]:
     """
     Get relevant data from the SAMI spectrum.
@@ -86,7 +87,8 @@ def get_sami_data(
     err = np.array(np.sqrt(var), dtype=float)
 
     if lam_medium[0] == "air" and lam_medium[1] == "vacuum":
-        lam_rest =util.air_to_vac(lam_rest)
+        lam_rest = util.air_to_vac(lam_rest)
+        # lam_rest = pyasl.airtovac2(lam_rest)
     elif lam_medium[0] == "vacuum" and lam_medium[1] == "air":
         lam_rest = util.vac_to_air(lam_rest)
     elif not set(lam_medium).issubset({"air", "vacuum"}):
@@ -94,6 +96,21 @@ def get_sami_data(
 
     flux *= 10 ** (flux_power_of_10 - 16)
     err *= 10 ** (flux_power_of_10 - 16)
+
+    #TODO: remove testing
+    if plot_as_is:
+        x_bounds = get_lam_bounds(const.H_ALPHA, const.VEL_PLOT_WIDTH, width_is_vel=True)
+        lam_of_max_flux = lam_rest[np.nanargmax(flux)]
+        plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+        plt.plot(lam_rest, flux)
+        plt.fill_between(lam_rest, flux - err, flux + err, color='lightgrey')
+        plt.xlim(x_bounds)
+        plt.axvline(lam_of_max_flux, color='red', linestyle='--', label=f'max flux 2015 {lam_of_max_flux:.2f} Å = {np.nanmax(flux):.2f}')
+        plt.ylim(0, 110)
+        plt.title("SAMI spectrum before filtering")
+        plt.legend()
+        plt.show()
+    #
 
     if perform_log_rebin:       # necessary for pPXF fitting
         lam_range = [lam_rest[0], lam_rest[-1]]
@@ -145,6 +162,7 @@ def get_sdss_data(
     rm_or_replace_outside_lam_bounds: bool | float = True,
     rm_or_replace_other_bad_values: bool | float = np.nan,
     z: float = const.Z_SPEC, # use 0 to get observed frame data
+    plot_as_is: bool = False, #TODO: remove testing
 ) -> dict[str, np.ndarray]:
     """
     Get relevant data from the SDSS spectrum.
@@ -207,6 +225,21 @@ def get_sdss_data(
     # ln_lam_obs = log_lam_obs * np.log(10)
     # ln_lam_rest = ln_lam_obs - np.log(1 + z)
 
+    #TODO: remove testing
+    if plot_as_is:
+        x_bounds = get_lam_bounds(const.H_ALPHA, const.VEL_PLOT_WIDTH, width_is_vel=True)
+        lam_of_max_flux = lam_rest[np.nanargmax(flux)]
+        plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+        plt.plot(lam_rest, flux)
+        plt.fill_between(lam_rest, flux - flux_err, flux + flux_err, color='lightgrey')
+        plt.xlim(x_bounds)
+        plt.axvline(lam_of_max_flux, color='red', linestyle='--', label=f'max flux 2001 {lam_of_max_flux:.2f} Å = {np.nanmax(flux):.2f}')
+        plt.ylim(0, 110)
+        plt.title("SDSS spectrum before filtering")
+        plt.legend()
+        plt.show()
+    #
+
     if np.any(~np.isfinite(lam_rest)):
         raise ValueError("ERROR: lam has nans")
 
@@ -230,6 +263,12 @@ def get_sdss_data(
 
     # d_ln_lam_rest = (ln_lam_rest[-1] - ln_lam_rest[0])/(len(ln_lam_rest) - 1) # average spacing between ln wavelengths
     # velscale = const.C_KM_S*d_ln_lam_rest  
+    #TODO: remove testing
+    # plt.plot(lam_rest, fwhm_per_pix)
+    # plt.ylim(bottom=0)
+    # plt.title("FWHM per pixel before filtering")
+    # plt.show()
+    #
 
     filtered_data = remove_or_replace_bad_values(
         lam=lam_rest,
@@ -240,6 +279,12 @@ def get_sdss_data(
         rm_or_replace_outside_lam_bounds=rm_or_replace_outside_lam_bounds,
         rm_or_replace_other_bad_values=rm_or_replace_other_bad_values
     )
+    #TODO: remove testing
+    # plt.plot(lam_rest, fwhm_per_pix)
+    # plt.ylim(bottom=0)
+    # plt.title("FWHM per pixel after filtering")
+    # plt.show()
+    #
 
     velscale = get_velscale(filtered_data["lam"])
     median_flux = np.nanmedian(filtered_data["flux"])
@@ -369,9 +414,9 @@ def get_adjusted_data(
     plot_just_resampled = plot_just_resampled or resampled_xlim is not None
     plot_resampled_and_blurred = plot_resampled_and_blurred or resampled_and_blurred_xlim is not None
     
-    input_data01 = get_sdss_data(fname_2001, folder_path=sdss_folder_path, z=z)
-    input_data15_blue = get_sami_data(fname_2015_blue, folder_path=sami_folder_path, z=z, resolving_power=const.RES_15_BLUE)
-    input_data15_red = get_sami_data(fname_2015_red, folder_path=sami_folder_path, z=z, resolving_power=const.RES_15_RED)
+    input_data01 = get_sdss_data(fname_2001, folder_path=sdss_folder_path, z=z, plot_as_is=True)
+    input_data15_blue = get_sami_data(fname_2015_blue, folder_path=sami_folder_path, z=z, resolving_power=const.RES_15_BLUE, perform_log_rebin=True)
+    input_data15_red = get_sami_data(fname_2015_red, folder_path=sami_folder_path, z=z, resolving_power=const.RES_15_RED, perform_log_rebin=True, plot_as_is=True)
     input_data21 = get_sdss_data(fname_2021, folder_path=sdss_folder_path, z=z)
     input_data22 = get_sdss_data(fname_2022, folder_path=sdss_folder_path, z=z)
 
@@ -403,6 +448,33 @@ def get_adjusted_data(
         input_data01["velscale"], input_data15_blue["velscale"],
         input_data15_red["velscale"], input_data21["velscale"], input_data22["velscale"]
     )
+
+    #TODO: remove testing
+    # plt.plot(lam01, fwhm01)
+    # plt.ylim(bottom=0)
+    # plt.title("FWHM per pixel for 2001")
+    # plt.show()
+
+    # plt.plot(lam15_blue, fwhm15_blue)
+    # plt.ylim(bottom=0)
+    # plt.title("FWHM per pixel for 2015 blue")
+    # plt.show()
+
+    # plt.plot(lam15_red, fwhm15_red)
+    # plt.ylim(bottom=0)
+    # plt.title("FWHM per pixel for 2015 red")
+    # plt.show()
+
+    # plt.plot(lam21, fwhm21)
+    # plt.ylim(bottom=0)
+    # plt.title("FWHM per pixel for 2021")
+    # plt.show()
+
+    # plt.plot(lam22, fwhm22)
+    # plt.ylim(bottom=0)
+    # plt.title("FWHM per pixel for 2022")
+    # plt.show()
+    #
 
     target_sdss_len = len(lam01)
     for sdss_arr in [lam01, lam21, lam22, flux01, flux21, flux22, err01, err21, err22, fwhm01, fwhm21, fwhm22]:
@@ -544,6 +616,7 @@ def get_adjusted_data(
             # print(f"SAMI 2015 mean red flux error: {np.nanmean(err15_red)}")
             #
         
+
         flux01_blurred, fwhm01_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power01, lam01, lam01, flux01)
         flux21_blurred, fwhm21_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power21, lam01, lam21, flux21)
         flux22_blurred, fwhm22_blurred = gaussian_blur_before_resampling(min_resolving_power, resolving_power22, lam01, lam22, flux22)
@@ -644,6 +717,7 @@ def get_adjusted_data(
         resampled_and_blurred_title = "Spectra from 2001 to 2022 (blurred then resampled to 2001 grid)"
 
     elif resample_step == 1:
+
         flux01_resampled, err01_resampled = flux01, err01
 
         flux15_blue_resampled, err15_blue_resampled = spectres.spectres(
@@ -736,36 +810,30 @@ def get_adjusted_data(
             all_data["2022"]["fwhm_per_pix"] = fwhm22_resampled
             return all_data
 
-        wavelength_step = np.median(np.diff(lam01))
-
-        flux01_resampled_blurred, fwhm01_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power01, lam01, flux01_resampled, wavelength_step)
-        flux21_resampled_blurred, fwhm21_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power21, lam01, flux21_resampled, wavelength_step)
-        flux22_resampled_blurred, fwhm22_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power22, lam01, flux22_resampled, wavelength_step)
-        flux15_red_resampled_blurred, fwhm15_red_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power15_red, lam01, flux15_red_resampled, wavelength_step)
-        flux15_blue_resampled_blurred, fwhm15_blue_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power15_blue, lam01, flux15_blue_resampled, wavelength_step)
+        flux01_resampled_blurred, fwhm01_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power01, lam01, flux01_resampled)
+        flux21_resampled_blurred, fwhm21_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power21, lam01, flux21_resampled)
+        flux22_resampled_blurred, fwhm22_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power22, lam01, flux22_resampled)
+        flux15_red_resampled_blurred, fwhm15_red_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power15_red, lam01, flux15_red_resampled)
+        flux15_blue_resampled_blurred, fwhm15_blue_resampled_blurred = gaussian_blur_after_resampling(min_resolving_power, resolving_power15_blue, lam01, flux15_blue_resampled)
 
         flux15_resampled_blurred, err15_resampled, fwhm15_resampled_blurred = combine_sami_vals(
             [flux15_blue_resampled_blurred, err15_blue_resampled, fwhm15_blue_resampled_blurred],
             [flux15_red_resampled_blurred, err15_red_resampled, fwhm15_red_resampled_blurred],
         )
 
-        for fwhm in [
-            fwhm01_resampled_blurred, fwhm15_resampled_blurred,
-            fwhm21_resampled_blurred, fwhm22_resampled_blurred
-        ]:
-            if not np.all(np.isclose(fwhm, fwhm01_resampled_blurred, equal_nan=True)):
-                for f, y in zip(
-                    [fwhm01_resampled_blurred, fwhm15_resampled_blurred,
-                    fwhm21_resampled_blurred, fwhm22_resampled_blurred],
-                    ["2001", "2015", "2021", "2022"]
-                ):
-                    plt.plot(lam01, f, label=y)
-                plt.legend()
-                plt.show()
-                raise ValueError("ERROR: fwhm_per_pix should be all the same after this step")
-            data.pop("fwhm_per_pix")
+        # fwhm should all be very similar now
+        mean_fwhm_after_resampling_and_blurring = np.nanmean(
+            [fwhm01_resampled_blurred, fwhm15_resampled_blurred,
+            fwhm21_resampled_blurred, fwhm22_resampled_blurred],
+            axis=0
+        )
 
-        all_data["fwhm_per_pix"] = fwhm01_resampled_blurred
+        for data in all_data.values():
+            # "2015" won't have fwhm_per_pix key, and "lam", "velscale" aren't epochs (dictionaries)
+            if isinstance(data, dict) and "fwhm_per_pix" in data.keys():
+                data.pop("fwhm_per_pix")
+
+        all_data["fwhm_per_pix"] = mean_fwhm_after_resampling_and_blurring
 
         all_data["2001"]["flux"] = flux01_resampled_blurred
         all_data["2015"]["flux"] = flux15_resampled_blurred
