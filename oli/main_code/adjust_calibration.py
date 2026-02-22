@@ -104,7 +104,7 @@ def gaussian_blur_before_resampling(
     # print(f"Low res sigma {np.mean(sigma_low_res_arr):.2f} - high res sigma {np.mean(sigma_high_res_arr):.2f} = {np.mean(sigma_low_res_arr) - np.mean(sigma_high_res_arr):.2f}")
     #
     if np.mean(sigma_low_res_arr) < np.mean(sigma_high_res_arr) or np.median(sigma_low_res_arr) < np.median(sigma_high_res_arr):
-        raise ValueError("ERROR: low-resolution sigma is less than high-resolution sigma")
+        raise ValueError("Low-resolution sigma is less than high-resolution sigma")
 
     new_sigma_high_res = np.full_like(sigma_high_res_arr, np.nan)
     
@@ -136,7 +136,7 @@ def gaussian_blur_before_resampling(
         
         if 0 < len(lam_high_res) - high_res_chunk_end_idx <= 2:
             warn_msg = (
-                f"WARNING: end of blurring chunk is close to the end of the "
+                f"End of blurring chunk is close to the end of the "
                 f"spectrum. Extending chunk indices ({high_res_chunk_start_idx}"
                 f" - {high_res_chunk_end_idx}) to the end of the spectrum ("
                 f"{high_res_chunk_start_idx} - {len(lam_high_res)})."
@@ -145,7 +145,7 @@ def gaussian_blur_before_resampling(
             high_res_chunk_end_idx = len(lam_high_res)
             lam_max = lam_high_res[-1]
         if high_res_chunk_end_idx - high_res_chunk_start_idx < 2:
-            raise ValueError("ERROR: chunk is too small. Use larger chunk_width.")
+            raise ValueError("Chunk is too small. Use larger chunk_width.")
         
         high_res_chunk_indices = np.arange(high_res_chunk_start_idx, high_res_chunk_end_idx)
         high_res_finite_flux_chunk_mask = high_res_chunk_indices[np.isfinite(flux_high_res[high_res_chunk_indices])]
@@ -215,7 +215,7 @@ def gaussian_blur_before_resampling(
     non_finite_sig = ~np.isfinite(new_sigma_high_res)
     non_finite_flux = ~np.isfinite(flux_high_res)
     if np.any(non_finite_sig != non_finite_flux):
-        raise ValueError("ERROR: new_sigma_high_res contains non-finite values where flux is finite")
+        raise ValueError("New_sigma_high_res contains non-finite values where flux is finite")
     new_fwhm_high_res = new_sigma_high_res * const.SIGMA_TO_FWHM
     #TD: remove testing
     # print(f"\n\nnew 'high' res - old high res average: {np.mean(new_fwhm_high_res) - np.mean(fwhm_high_res):.2f}")
@@ -296,7 +296,7 @@ def gaussian_blur_after_resampling(
         
         if 0 <len(lam) - chunk_end_idx <= 2:
             warn_msg = (
-                f"WARNING: end of blurring chunk is close to the end of the "
+                f"End of blurring chunk is close to the end of the "
                 f"spectrum. Extending chunk indices ({chunk_start_idx} - "
                 f"{chunk_end_idx}) to the end of the spectrum ("
                 f"{chunk_start_idx} - {len(lam)})."
@@ -305,7 +305,7 @@ def gaussian_blur_after_resampling(
             chunk_end_idx = len(lam)
             lam_max = lam[-1]
         if chunk_end_idx - chunk_start_idx < 2:
-            raise ValueError("ERROR: chunk is too small. Use larger chunk_width.")
+            raise ValueError("Chunk is too small. Use larger chunk_width.")
         
         chunk_indices = np.arange(chunk_start_idx, chunk_end_idx)
 
@@ -329,7 +329,7 @@ def gaussian_blur_after_resampling(
     non_finite_sig = ~np.isfinite(new_sigma_high_res)
     non_finite_flux = ~np.isfinite(flux_high_res)
     if np.any(non_finite_sig != non_finite_flux):
-        raise ValueError("ERROR: new_sigma_high_res contains non-finite values where flux is finite")
+        raise ValueError("New_sigma_high_res contains non-finite values where flux is finite")
     new_fwhm_high_res = new_sigma_high_res * const.SIGMA_TO_FWHM
 
     return blurred, new_fwhm_high_res

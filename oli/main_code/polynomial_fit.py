@@ -71,7 +71,67 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
     blur_step: int = 1,
     resample_step: int = 2,
     extrapolate_beyond_max_baseline_lam: bool = False,
-) -> tuple[np.poly1d | None, np.ndarray, np.ndarray]:
+) -> dict[str, np.ndarray | np.poly1d | int | None]:
+    """
+    Finds the least squares polynomial fit to the ratio of the flux of
+    the year_to_adjust spectrum to the baseline_year spectrum, then normalises
+    the year_to_adjust spectrum (and its errors) by dividing by the polynomial fit.
+
+    Parameters
+    ----------
+    data: dict[str, dict[str, np.ndarray]] | None
+        The data to adjust. If None, the data is created using :func:`data_reading.get_adjusted_data`.
+    year_to_adjust: int
+        The year to adjust. Must be one of 2001, 2015, 2021, or 2022.
+    baseline_year: int
+        The year to use as the baseline (calibration) flux. Must be one of 2001, 2015, 2021, or 2022.
+    lambdas_to_ignore_width: float
+        The width of wavelengths to ignore around the Balmer lines when finding the flux
+        ratio and fitting the polynomial.
+    width_is_vel: bool
+        If True, the `lambdas_to_ignore_width` is in km/s, else in angstroms.
+    poly_degree: float
+        The degree of the polynomial to fit to the flux ratio.
+    bin_by_med: bool = True
+        If True, the flux ratio is binned by the median before fitting the polynomial.
+    bin_width: float = const.POLY_FIT_BIN_WIDTH
+        The width of the bins to use when calculating the median of the flux ratio.
+    plot_ratio_selection: bool = True
+        If True, the ratio of the flux of the year_to_adjust spectrum to the baseline_year
+        spectrum is plotted, including the highlighted flux in Balmer regions to ignore.
+    plot_poly_ratio: bool = True
+        If True, the ratio of the flux of the year_to_adjust spectrum to the baseline_year
+        spectrum is plotted, including the binned median. Note, the selection of Balmer
+        regions to ignore is not plotted here.
+    plot_adjusted: bool = True
+        If True, the adjusted spectrum is plotted against the unadjusted and baseline spectra.
+    adjusted_plot_lam_bounds: tuple[float] | None = None
+        The wavelength bounds of the `plot_adjusted` plot.
+    adjusted_flux_y_bounds: tuple[float] | None = None
+        The flux bounds of the `plot_adjusted` plot.
+    ions: dict[str, float] | None = None
+        The ions to plot on the `plot_adjusted` plot. Keys represent the string labels seen in
+        the legend, and values represent the rest wavelength of each line. E.g. `{"[OIII]": 5007}`.
+    blur_step: int = 1
+        The step to blur the unadjusted spectra. 0 to not blur, 1 to blur before resampling, 2 to
+        blur after resampling. Note, this argument is irrelevant if `data` is provided.
+    resample_step: int = 2
+        The step to resample the unadjusted spectra. 0 to not resample, 1 to resample before blurring,
+        2 to resample after blurring. Note, this argument is irrelevant if `data` is provided.
+    extrapolate_beyond_max_baseline_lam: bool = False
+        If True, the polynomial fit is extrapolated beyond the maximum wavelength of the baseline
+        spectrum. This is likely to return absurd values since the polynomial fit is only applied
+        to data within the wavelength range of the baseline spectrum.
+
+    Returns
+    -------
+    to_return: dict[str, np.ndarray | np.poly1d | int | None]
+        A dictionary with the keys "polynom", "flux", "flux_error",
+        "last_valid_lam_idx", and values calculated from
+        :func:`data_reading.get_adjusted_data`, including "fwhm_per_pix",
+        "good_pixels", "velscale", "lam".
+    """
+
     possible_years = [2001, 2015, 2021, 2022]
     if year_to_adjust not in possible_years or baseline_year not in possible_years:
         raise ValueError(f"year should be in {possible_years}")
@@ -96,20 +156,35 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
 
     lam = data["lam"]
     flux = data[f"{year_to_adjust}"]["flux"]
-    err = data[f"{year_to_adjust}"]["flux_err"]
+    err = data[f"{year_to_adjust}"]["flux_error"]
     baseline_flux = data[f"{baseline_year}"]["flux"]
-    # baseline_err = data[f"{baseline_year}"]["flux_err"]
+    # baseline_err = data[f"{baseline_year}"]["flux_error"]
+
+    to_return = {
+        "lam": lam,
+        "polynom": None,
+        "flux": flux,
+        "flux_error": err,
+        "last_valid_lam_idx": np.nan,
+        "fwhm_per_pix": data[f"{year_to_adjust}"]["fwhm_per_pix"],
+        "good_pixels": data[f"{year_to_adjust}"]["good_pixels"],
+        "velscale": data[f"{year_to_adjust}"]["velscale"],
+    }
 
     if year_to_adjust == baseline_year:
         if extrapolate_beyond_max_baseline_lam:
-            return None, flux, err, np.nan
+            return to_return
         last_valid_lam_idx = int(np.where(np.isfinite(flux))[0][-1])
-        adjusted_flux = flux[:last_valid_lam_idx]
-        adjusted_err = err[:last_valid_lam_idx]
-        return None, adjusted_flux, adjusted_err, last_valid_lam_idx
+        to_return["flux"] = flux[:last_valid_lam_idx]
+        to_return["flux_error"] = err[:last_valid_lam_idx]
+        to_return["last_valid_lam_idx"] = last_valid_lam_idx
+        to_return["lam"] = lam[:last_valid_lam_idx]
+        to_return["fwhm_per_pix"] = to_return["fwhm_per_pix"][:last_valid_lam_idx]
+        to_return["good_pixels"] = to_return["good_pixels"][to_return["good_pixels"] < last_valid_lam_idx]
+        return to_return
 
     actual_ratio_flux = flux / baseline_flux
-    balmer_mask = np.zeros(lam.shape, dtype=bool)
+    balmer_mask = np.zeros_like(lam, dtype=bool)
 
     lambdas_to_ignore = [
         get_lam_bounds(const.H_ALPHA, lambdas_to_ignore_width, width_is_vel=width_is_vel),
@@ -156,7 +231,7 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
         adjusted_lam = lam[:last_valid_lam_idx]
     else:
         adjusted_lam = lam
-        last_valid_lam_idx = np.nan
+        last_valid_lam_idx = len(lam)
 
     if plot_adjusted:
         adjusted_plot_title = f"Spectral flux density of {year_to_adjust} (polynomial fit to {baseline_year})"
@@ -174,4 +249,11 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
             title=adjusted_plot_title,
             save_fig_name=f"sfd_{(year_to_adjust - 2000):02d}_to_{(baseline_year - 2000):02d}_poly_fit"
         )
-    return polynom, adjusted_flux, adjusted_err, last_valid_lam_idx
+    to_return["polynom"] = polynom
+    to_return["flux"] = adjusted_flux
+    to_return["flux_error"] = adjusted_err
+    to_return["last_valid_lam_idx"] = last_valid_lam_idx
+    to_return["lam"] = lam[:last_valid_lam_idx]
+    to_return["fwhm_per_pix"] = to_return["fwhm_per_pix"][:last_valid_lam_idx]
+    to_return["good_pixels"] = to_return["good_pixels"][to_return["good_pixels"] < last_valid_lam_idx]
+    return to_return

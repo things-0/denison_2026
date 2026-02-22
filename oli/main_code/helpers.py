@@ -65,7 +65,7 @@ def combine_sami_vals(
             np.sum(np.isfinite(red_val)) !=
             np.sum(np.isfinite(combined_val))
         ):
-            raise ValueError("ERROR: mismatch in number of non-nan values")
+            raise ValueError("Mismatch in number of non-nan values")
         combined_vals.append(combined_val)
     return tuple(combined_vals)
 
@@ -95,7 +95,7 @@ def get_velscale(
     lam: np.ndarray,
 ) -> float:
     """
-    Get the velocity scale.
+    Get the velocity scale (as calculated in pPXF assertion).
 
     Parameters
     ----------
@@ -108,7 +108,10 @@ def get_velscale(
     float
         The velocity scale (km/s).
     """
-    return const.C_KM_S * np.diff(np.log(lam[[0, -1]]))/(len(lam) - 1)
+    lam_first_last = lam[[0, -1]]
+    ln_lam_first_last = np.log(lam_first_last)
+    av_ln_lam_diff = np.diff(ln_lam_first_last)[0]/(len(lam) - 1) # average spacing between ln wavelengths
+    return const.C_KM_S * av_ln_lam_diff
 
 def remove_or_replace_bad_values(
     lam: np.ndarray,
@@ -146,7 +149,7 @@ def remove_or_replace_bad_values(
     Returns
     -------
     dict[str, np.ndarray]
-        A dictionary with the keys "lam", "flux", "flux_err", "fwhm_per_pix", "good_mask",
+        A dictionary with the keys "lam", "flux", "flux_error", "fwhm_per_pix", "good_mask",
         and the corresponding removed/replaced values.
     """
 
@@ -200,7 +203,7 @@ def remove_or_replace_bad_values(
     return {
         "lam": new_lam,
         "flux": new_flux,
-        "flux_err": new_err,
+        "flux_error": new_err,
         "fwhm_per_pix": new_fwhm_per_pix,
         "good_mask": good_mask
     }
@@ -209,7 +212,7 @@ def custom_showwarning(msg, category, filename, lineno, *args, **kwargs):
     """
     Custom warning handler.
     """
-    print(f"WARNING ({filename}:{lineno}): {msg}", flush=True)
+    print(f"WARNING ({filename}:{lineno}):\n{msg}", flush=True)
 
 def get_first_valid_flux(flux: np.ndarray):
     """
@@ -1348,3 +1351,40 @@ def get_scaled_y_bounds(
         return ax1_y_bounds, (ax2_y_bounds[0], ax2_high)
     else:
         raise ValueError("One of ax2_y_bounds must be None")
+
+def set_all_values(
+    all_data: dict[str, dict[str, np.ndarray]],
+    key_values: list[tuple[str, Any]],
+) -> None:
+    """
+    Set the values for particular keys across all epochs in the data.
+
+    Parameters
+    ----------
+    all_data: dict[str, dict[str, np.ndarray]]
+        The data to change. See :func:`data_reading.get_adjusted_data` for structure.
+    key_values: list[tuple[str, Any]]
+        The list of key-value pairs to change to.
+    """
+    for epoch_key, epoch_data in all_data.items():
+        if isinstance(epoch_data, dict):
+            if epoch_key not in ["2001", "2015", "2015_blue", "2015_red", "2021", "2022"]:
+                raise ValueError(f"Invalid key: {epoch_key} (must correspond to an epoch if outer key is a dictionary)")
+            for key, value in key_values:
+                epoch_data[key] = value
+
+def assert_lengths_match(
+    all_data: dict[str, dict[str, np.ndarray]]
+) -> None:
+    """
+    Assert that all arrays in the data have the same length.
+    """
+    for epoch_data in all_data.values():
+        if isinstance(epoch_data, dict):
+            arrays = (epoch_data["flux"], epoch_data["flux_error"], epoch_data["fwhm_per_pix"], epoch_data["lam"])
+            for array in arrays:
+                if len(array) != len(arrays[0]):
+                    raise ValueError(f"Arrays have different lengths: {len(array)} != {len(arrays[0])}")
+            if np.max(epoch_data["good_pixels"]) >= len(epoch_data["flux"]):
+                raise ValueError(f"Good pixels index out of bounds: {np.max(epoch_data['good_pixels'])} >= {len(epoch_data['flux'])}")
+    

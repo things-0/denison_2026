@@ -11,8 +11,9 @@ import os
 import warnings
 
 from . import constants as const
-from .data_reading import get_sdss_data, get_sami_data
-from .helpers import get_lam_mask
+from .data_reading import get_sdss_data, get_sami_data, get_adjusted_data
+from .helpers import get_lam_mask, get_velscale
+from .polynomial_fit import apply_poly_fit
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,10 +23,17 @@ from ppxf.ppxf import ppxf
 import ppxf.ppxf_util as util
 import ppxf.sps_util as lib
 
-def assign_gas_components(gas_names):
+def assign_narrow_components(
+    gas_names: list[str],
+) -> tuple[list[int], int]:
     """
+    Uses a grouping scheme to assign component numbers to emission lines.
 
-    
+    Parameters
+    ----------
+    gas_names: list[str]
+        The names of the gas lines to assign components to.
+
     Returns:
         component_list: List of component numbers (one per gas line)
         max_component: Highest component number used
@@ -73,48 +81,84 @@ def assign_gas_components(gas_names):
     return component_list, max_component
 
 def fit_agn(
-    is_sdss: bool,
     data: dict[str, np.ndarray] | None = None,
+    baseline_year: int | None = 2015,
+    year_to_adjust: int | None = None,
+    is_sdss: bool | None = None,
     sami_res: float | None = None,
     in_file_name: str | None = None,
     outfile_suffix: str = "",
     outfile_dir: Path = const.PPXF_DATA_DIR,
     z: float = const.Z_SPEC,
     normalise_flux: bool = True,
+    filter_bad_pixels: bool = True,
 ):
-
-    #TODO: use get_adjusted_data instead
-    #TODO: apply polyfit first
     if data is None:
-        if in_file_name is None:
-            raise ValueError("in_file_name is required if data is not provided")
-        if is_sdss:
-            data = get_sdss_data( 
-                file_name=in_file_name, folder_path=const.SDSS_DATA_DIR,
-                z=z, rm_or_replace_other_bad_values=True,
+        if baseline_year is not None:
+            if in_file_name is not None:
+                raise ValueError("baseline_year provided but in_file_name is not None.")
+            if year_to_adjust is None:
+                raise ValueError("year_to_adjust is required if using baseline_year to get data")
+            all_epochs_data = get_adjusted_data(
+                blur_step=0,
+                resample_step=1,
+                plot_resampled_and_blurred=False,
+                z=z
+            )
+            data = apply_poly_fit(
+                data=all_epochs_data,
+                year_to_adjust=year_to_adjust,
+                baseline_year=baseline_year,
+                plot_ratio_selection=False,
+                plot_poly_ratio=False,
+                plot_adjusted=False,
             )
         else:
-            if sami_res is None:
-                raise ValueError("sami_res is required if data is not provided and is_sdss is False")
-            data = get_sami_data(
-                file_name=in_file_name, folder_path=const.SAMI_DATA_DIR,
-                z=z, perform_log_rebin=True, resolution=sami_res,
-                rm_or_replace_other_bad_values=True,
-            )
-    galaxy, noise, medflux, lam_gal, fwhm_gal, goodpixels, velscale = (
+            warn_msg = "Baseline year not provided. Attempting to read raw data without applying polynomial fit."
+            warnings.warn(warn_msg)
+            if in_file_name is None:
+                raise ValueError("in_file_name is required if data is not provided and baseline_year is None.")
+            if is_sdss is None:
+                raise ValueError("is_sdss is required if data is not provided and baseline_year is None.")
+            if is_sdss:
+                data = get_sdss_data( 
+                    file_name=in_file_name, folder_path=const.SDSS_DATA_DIR,
+                    z=z, rm_or_replace_other_bad_values=True,
+                )
+            else:
+                if sami_res is None:
+                    raise ValueError("sami_res is required if data is not provided, baseline_year is None, and is_sdss is False")
+                data = get_sami_data(
+                    file_name=in_file_name, folder_path=const.SAMI_DATA_DIR,
+                    z=z, perform_log_rebin=True, resolving_power=sami_res,
+                    rm_or_replace_other_bad_values=True,
+                )
+    galaxy, noise, lam_gal, fwhm_gal, goodpixels, velscale = (
         data["flux"],
-        data["flux_err"],
-        data["median_flux"],
+        data["flux_error"],
         data["lam"],
         data["fwhm_per_pix"],
         data["good_pixels"],
         data["velscale"]
     )
+    medflux = np.nanmedian(galaxy)
     if normalise_flux:
         galaxy /= medflux
         noise /= medflux
 
     print(f"goodpixels: {goodpixels}")
+
+    for arr in (galaxy, noise, lam_gal, fwhm_gal):
+        if np.any(~np.isfinite(arr[goodpixels])):
+            raise ValueError("NaN values found in 'goodpixels' data")
+    if filter_bad_pixels:
+        # sps_lib raises an error if fwhm_gal_dic or noise contains nans
+        lam_gal = lam_gal[goodpixels]
+        galaxy = galaxy[goodpixels]
+        noise = noise[goodpixels]
+        fwhm_gal = fwhm_gal[goodpixels]
+        goodpixels = np.arange(len(lam_gal))
+        velscale = get_velscale(lam_gal)
 
     # decide which templates to use:
     # sps_name = 'fsps'
@@ -188,7 +232,7 @@ def fit_agn(
     component += [0] * n_temps
     
     # Narrow gas components: Use the original grouping scheme
-    narrow_components, max_narrow_component = assign_gas_components(gas_names)
+    narrow_components, max_narrow_component = assign_narrow_components(gas_names)
     component += narrow_components
     
     # Broad Balmer components: All Balmer lines in each set tied together
@@ -208,14 +252,14 @@ def fit_agn(
     # Component 0: Stellar (narrow velocity range)
     bounds.append([(-500, 500), (10, 400)])
     
-    # Components 1-9: Narrow emission lines (use max_narrow_component to determine count)
+    # Components 1-9: Narrow emission lines
     for i in range(1, max_narrow_component + 1):
         bounds.append([(-500, 500), (50, 400)])
     
     # Broad Balmer components (wider velocity and dispersion ranges)
     bounds.append([(-2000, 2000), (500, 5000)])     # Broad 1
-    bounds.append([(-2000, 2000), (1000, 10000)])   # Broad 2  
-    bounds.append([(-2000, 2000), (1000, 10000)])   # Broad 3
+    bounds.append([(-2000, 2000), (1000, 3500)])   # Broad 2  
+    bounds.append([(-2000, 2000), (1000, 35000)])   # Broad 3
  
 
         
@@ -314,6 +358,7 @@ def fit_agn(
         outfile_path = outfile_dir / outfile_name
         # outfile_path = os.path.join(outfile_dir, outfile_name)
     fits.HDUList(hdus).writeto(outfile_path, overwrite=False)
+    print(f"\n\nFits file written to {outfile_path}")
 
 def get_nl_and_stell_cont(
     infile: str = "ppxf_components",
