@@ -52,7 +52,7 @@ def get_polynom_fit(
         )
     return polynom, polynom_vals
 
-def apply_poly_fit(
+def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
     data: dict[str, dict[str, np.ndarray]] | None = None,
     year_to_adjust: int = 2022,
     baseline_year: int = 2015,

@@ -157,7 +157,7 @@ def get_sdss_data(
     file_name: str,
     folder_path: Path = const.SDSS_DATA_DIR,
     flux_power_of_10: int = 17,
-    lam_medium: tuple[str, str] = ("air", "vacuum"),
+    lam_medium: tuple[str, str] = ("vacuum", "vacuum"),
     lam_bounds: tuple[float, float] | None = const.TOTAL_LAM_BOUNDS,
     rm_or_replace_outside_lam_bounds: bool | float = True,
     rm_or_replace_other_bad_values: bool | float = np.nan,

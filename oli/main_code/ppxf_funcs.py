@@ -24,18 +24,7 @@ import ppxf.sps_util as lib
 
 def assign_gas_components(gas_names):
     """
-    Assign component numbers to emission lines following the original grouping scheme.
-    
-    Grouping rules:
-    - Component 1: All narrow Balmer lines (H10, H9, H8, Heps, Hdelta, Hgamma, Hbeta, Halpha)
-    - Component 2: [OII] doublet ([OII]3726, [OII]3729)
-    - Component 3: [SII] doublet ([SII]6716, [SII]6731)
-    - Component 4: [NeIII] doublet ([NeIII]3968, [NeIII]3869)
-    - Component 5: HeII4687
-    - Component 6: HeI5876
-    - Component 7: [OIII]5007_d
-    - Component 8: [OI]6300_d
-    - Component 9: [NII]6583_d
+
     
     Returns:
         component_list: List of component numbers (one per gas line)
@@ -94,11 +83,13 @@ def fit_agn(
     normalise_flux: bool = True,
 ):
 
+    #TODO: use get_adjusted_data instead
+    #TODO: apply polyfit first
     if data is None:
         if in_file_name is None:
             raise ValueError("in_file_name is required if data is not provided")
         if is_sdss:
-            data = get_sdss_data(
+            data = get_sdss_data( 
                 file_name=in_file_name, folder_path=const.SDSS_DATA_DIR,
                 z=z, rm_or_replace_other_bad_values=True,
             )
