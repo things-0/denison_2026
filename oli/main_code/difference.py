@@ -12,8 +12,34 @@ def get_diff_spectra(
 ) -> tuple[
     tuple[np.ndarray, np.ndarray, np.ndarray],
     tuple[np.ndarray, np.ndarray, np.ndarray],
-    np.ndarray
+    np.ndarray | None
 ]:
+    """
+    Subtract the 2001 spectral flux density from the flux of the other epochs
+    (2015, 2021, and 2022).
+
+    Parameters
+    ----------
+    adjusted_fluxes: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None
+        The fluxes of the 2001, 2015, 2021, and 2022 epochs.
+    arcsec: int
+        The arcsec of the SAMI data. (must be 3 or 4)
+    blur_step: int
+        The step to blur the spectra. 0 to not blur, 1 to blur before resampling,
+        2 to blur after resampling. Note: this argument is irrelevant if `adjusted_fluxes`
+        is provided.
+    resample_step: int
+        The step to resample the spectra. 0 to not resample, 1 to resample before
+        blurring, 2 to resample after blurring. Note: this argument is irrelevant
+        if `adjusted_fluxes` is provided. Additionally, to perform an element-wise
+        subtraction, the spectra must be resampled onto the same wavelength grid
+        (resample_step > 0).
+
+    Returns
+    -------
+    diff_spectra: tuple[np.ndarray, np.ndarray, np.ndarray]
+        The difference spectra of the 2015, 2021, and 2022 epochs.
+    """
     if adjusted_fluxes is None:
         if resample_step == 0:
             raise ValueError("Data must be resampled to get_diff_spectra")
@@ -62,6 +88,7 @@ def get_diff_spectra(
             adjusted_data_01["last_valid_lam_idx"], adjusted_data_15["last_valid_lam_idx"],
             adjusted_data_21["last_valid_lam_idx"], adjusted_data_22["last_valid_lam_idx"]
         )
+        # clip lam in case polynomial fit created invalid fluxes beyond max lam of baseline (2015)
         lam_adjusted = lam[:int(np.nanmin((
             last_valid_lam_idx_01, last_valid_lam_idx_15,
             last_valid_lam_idx_21, last_valid_lam_idx_22
@@ -84,14 +111,3 @@ def get_diff_spectra(
     diff_22_err = np.sqrt(adjusted_01_err_15**2 + adjusted_22_err_15**2)
 
     return (diff_15, diff_21, diff_22), (diff_15_err, diff_21_err, diff_22_err), lam_adjusted
-    # if return_lam and lam_adjusted is not None:
-    #     to_return = (diff_15, diff_21, diff_22), (diff_15_err, diff_21_err, diff_22_err), lam_adjusted
-    # elif return_lam and lam_adjusted is None:
-    #     raise ValueError(
-    #         "lam can only be returned if adjusted_fluxes "
-    #         "are calculated within this function."
-    #     )
-    # else:
-    #     to_return = (diff_15, diff_21, diff_22), (diff_15_err, diff_21_err, diff_22_err)
-        
-    # return to_return

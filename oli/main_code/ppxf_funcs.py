@@ -436,6 +436,8 @@ def plot_fit_comp(
     in_file_suffix: str = "",
     in_file_dir: Path = const.PPXF_DATA_DIR,
     fit_is_normalised: bool = True,
+    plot_individual_gas_components: bool = False,
+    plot_all_gas_components: bool = True,
 ):
 
     if in_file_suffix != "":
@@ -473,26 +475,26 @@ def plot_fit_comp(
     
     gas_components = dict(sorted(gas_components.items()))
 
-    # plot indiviual gas components:
-    for k, spec in gas_components.items():
-        plt.figure(figsize=const.FIG_SIZE, layout="constrained")
-        plt.plot(lam, spec, 'k')
-        plt.title(f'Gas component {k}')
-        plt.xlabel(r'Wavelength [$\AA$]')
-        plt.ylabel('Flux')
-        # plt.tight_layout()
-        plt.show()
+    if plot_individual_gas_components:
+        for k, spec in gas_components.items():
+            plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+            plt.plot(lam, spec, 'k')
+            plt.title(f'Gas component {k}')
+            plt.xlabel(r'Wavelength [$\AA$]')
+            plt.ylabel('Flux')
+            # plt.tight_layout()
+            plt.show()
 
-    # plot indiviual gas components:
-    plt.figure(figsize=const.FIG_SIZE, layout="constrained")
-    for i, (k, spec) in enumerate(gas_components.items()):
-        plt.plot(lam, spec, 'k', color=const.ALT_COLOUR_MAP(i), label=f'Gas component {k}')
-        plt.xlabel(r'Wavelength [$\AA$]')
-        plt.ylabel('Flux')
-        # plt.tight_layout()
-    plt.title(f"All Gas components ({in_file_suffix})")
-    plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
-    plt.show()
+    if plot_all_gas_components:
+        plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+        for i, (k, spec) in enumerate(gas_components.items()):
+            plt.plot(lam, spec, 'k', color=const.ALT_COLOUR_MAP(i), label=f'Gas component {k}')
+            plt.xlabel(r'Wavelength [$\AA$]')
+            plt.ylabel('Flux')
+            # plt.tight_layout()
+        plt.title(f"All Gas components ({in_file_suffix})")
+        plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
+        plt.show()
         
     # get the narrow IDs:
     narrow_ids = [k for k in gas_components if k <= max_narrow_component]

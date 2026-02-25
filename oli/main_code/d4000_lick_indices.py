@@ -3,8 +3,9 @@ import scipy as sp
 
 from . import constants as const
 
-#Conversion from FWHM to Gaussian sigma
-FWHM_sigma=1/const.SIGMA_TO_FWHM
+# ------------------------------------------------------------
+# Modified code from Scott (and Adam?)'s code
+# ------------------------------------------------------------
 
 def gaussian(
     x: np.ndarray,
@@ -62,16 +63,16 @@ def flux_per_pix(
 
 
 lick_res={
-    'D4000': 11.0/FWHM_sigma,   #This may not be the right resolution. Was 16 A FWHM in Balogh et al. 1999, but smoothing may not have been applied in subsequent papers. Ask Nic Scott!
-    'Hdelta_A': 10.0/FWHM_sigma,
-    'Ca4227': 9.0/FWHM_sigma,
-    'G4300': 9.5/FWHM_sigma,
-    'Fe4383': 9.0/FWHM_sigma,
-    'Fe5270': 8.4/FWHM_sigma,
-    'Hbeta':8.4/FWHM_sigma,
-    'Mg_b': 8.4/FWHM_sigma,
-    'CN_1': 10.0/FWHM_sigma,
-    'CN_2': 10.0/FWHM_sigma        
+    'D4000': 11.0 * const.SIGMA_TO_FWHM,   #This may not be the right resolution. Was 16 A FWHM in Balogh et al. 1999, but smoothing may not have been applied in subsequent papers. Ask Nic Scott!
+    'Hdelta_A': 10.0 * const.SIGMA_TO_FWHM,
+    'Ca4227': 9.0 * const.SIGMA_TO_FWHM,
+    'G4300': 9.5 * const.SIGMA_TO_FWHM,
+    'Fe4383': 9.0 * const.SIGMA_TO_FWHM,
+    'Fe5270': 8.4 * const.SIGMA_TO_FWHM,
+    'Hbeta':8.4 * const.SIGMA_TO_FWHM,
+    'Mg_b': 8.4 * const.SIGMA_TO_FWHM,
+    'CN_1': 10.0 * const.SIGMA_TO_FWHM,
+    'CN_2': 10.0 * const.SIGMA_TO_FWHM        
 }
 """
 Resolution at which to calculate indices.
@@ -130,7 +131,7 @@ def blur_spectrum(
     wavelength : array
         Wavelength vector
     spec : array
-        Spectrum
+        Spectral flux density
     res_in : float
         Native resolution in Angstroms. Sigma, not FWHM.
     res_out : float
@@ -152,7 +153,7 @@ def blur_spectrum(
     transfer_smooth=sp.signal.convolve(transfer,kernel,mode='same')
     return spec_smooth/transfer_smooth
 
-def flam_fnu(
+def flam_fnu( # not sure what this function does...?
     wave: np.ndarray,
     flam: np.ndarray
 ) -> np.ndarray:
@@ -174,9 +175,9 @@ def D4000_w_errs(
     wave : array
         Wavelength vector
     spec : array
-        Spectrum
+        Spectral flux density
     var : array
-        Variance spectrum
+        Flux variance
     z : float
         Redshift of the spectrum. Note: set z=0 if spec is already rest frame.
     res : float, optional

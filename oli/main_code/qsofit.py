@@ -21,6 +21,32 @@ def edit_qsopar(
     make_copy: bool = True,
     print_change: bool = True
 ) -> None:
+    """
+    Edits a value in the qsopar file.
+
+    Parameters
+    ----------
+    file_name: str
+        The name of the qsopar file.
+    value_name_to_edit: str
+        The name of the value to edit.
+    new_value: Any
+        The new value to set.
+    col_name_and_val: tuple[str, Any] | None
+        The column name and value to match.
+    mask: np.ndarray | None
+        The mask used to locate the data to edit. Should only be
+        provided if col_name_and_val is None.
+    folder_name: str
+        The name of the folder containing the qsopar file.
+    ext_num: int
+        The extension number of the hdulist to edit in the qsopar file.
+    make_copy: bool
+        Whether to make a copy of the edited qsopar file or save changes
+        to the original file.
+    print_change: bool
+        Whether to print the changes made.
+    """
     try:
         with fits.open(folder_name + file_name, mode=('readonly' if make_copy else 'update')) as hdul:
 

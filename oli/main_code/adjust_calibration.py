@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from .helpers import convert_lam_to_vel, convert_vel_to_lam, get_lam_centre
+from .helpers import convert_vel_to_lam, get_lam_centre
 
 from . import constants as const
 
@@ -55,10 +55,9 @@ def clip_sami_blue_edge(
 def gaussian_blur_before_resampling(
     low_resolving_power: np.ndarray | float, 
     high_resolving_power: np.ndarray | float, 
-    lam_low_res: np.ndarray,            # should always be lam01?
+    lam_low_res: np.ndarray,
     lam_high_res: np.ndarray,
     flux_high_res: np.ndarray,
-    # n_chunks: int = 100
     chunk_width: float = const.VEL_BLUR_BIN_WIDTH, # km/s
     chunk_width_is_vel: bool = True
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -73,7 +72,7 @@ def gaussian_blur_before_resampling(
     high_resolving_power: np.ndarray | float
         The resolving power of the high-resolution spectrum.
     lam_low_res: np.ndarray
-        The wavelength of the low-resolution spectrum.
+        The wavelength of the low-resolution spectrum (should be SDSS lam).
     lam_high_res: np.ndarray
         The wavelength of the high-resolution spectrum.
     flux_high_res: np.ndarray
@@ -98,32 +97,16 @@ def gaussian_blur_before_resampling(
     sigma_low_res_arr = fwhm_low_res / const.SIGMA_TO_FWHM
     sigma_high_res_arr = fwhm_high_res / const.SIGMA_TO_FWHM
 
-    
-
-    #TD: remove testing
-    # print(f"Low res sigma {np.mean(sigma_low_res_arr):.2f} - high res sigma {np.mean(sigma_high_res_arr):.2f} = {np.mean(sigma_low_res_arr) - np.mean(sigma_high_res_arr):.2f}")
-    #
     if np.mean(sigma_low_res_arr) < np.mean(sigma_high_res_arr) or np.median(sigma_low_res_arr) < np.median(sigma_high_res_arr):
         raise ValueError("Low-resolution sigma is less than high-resolution sigma")
 
     new_sigma_high_res = np.full_like(sigma_high_res_arr, np.nan)
     
-
-    #TD: remove testing
-    n_smoothed = 0
-    n_ignored = 0
-    #
-
     blurred = flux_high_res.copy()
 
-    # chunk_size = int(np.ceil(len(lam_high_res) / n_chunks))
-    
-    # for i in range(n_chunks):
-    #     if i == n_chunks:
-    #         pass
-    i = 0
     lam_min = lam_high_res[0]
     while lam_min < lam_high_res[-1]:
+        # get (lam_min, lam_max) bounds for this chunk
         if chunk_width_is_vel:
             lam_centre = get_lam_centre(lam_min, vel=-chunk_width / 2)
             lam_max = convert_vel_to_lam(chunk_width / 2, lam_centre=lam_centre)
@@ -142,12 +125,14 @@ def gaussian_blur_before_resampling(
                 f"{high_res_chunk_start_idx} - {len(lam_high_res)})."
             )
             warnings.warn(warn_msg)
+            # this prevents the next chunk from being only 1 or 2 pixels long
             high_res_chunk_end_idx = len(lam_high_res)
             lam_max = lam_high_res[-1]
         if high_res_chunk_end_idx - high_res_chunk_start_idx < 2:
             raise ValueError("Chunk is too small. Use larger chunk_width.")
         
         high_res_chunk_indices = np.arange(high_res_chunk_start_idx, high_res_chunk_end_idx)
+        # index locations of finite high res flux in this chunk
         high_res_finite_flux_chunk_mask = high_res_chunk_indices[np.isfinite(flux_high_res[high_res_chunk_indices])]
         
         # Find low_res wavelengths that fall in this range
@@ -161,11 +146,6 @@ def gaussian_blur_before_resampling(
             sigma_low_res_median = np.median(sigma_low_res_chunk) # angstroms
             sigma_high_res_median = np.median(sigma_high_res_chunk) # angstroms
 
-            #TD: remove testing
-            # diffs = np.diff(lam_high_res_chunk)
-            # print(f"\nChunk {i+1}\nMin step: {diffs.min()}, Max step: {diffs.max()}, Std/Mean: {diffs.std()/diffs.mean()}")
-            #
-
             lam_high_res_chunk = lam_high_res[high_res_chunk_indices]
             wavelength_step = np.median(np.diff(lam_high_res_chunk))
 
@@ -175,54 +155,26 @@ def gaussian_blur_before_resampling(
             # provided chunk_width is small enough.
             sigma_kernel_sq = sigma_low_res_median**2 - sigma_high_res_median**2
 
-            #TD: remove testing
-            # If CV is small, values are approximately constant
-            cv_low_res = np.std(sigma_low_res_chunk) / np.median(sigma_low_res_chunk)
-            cv_high_res = np.std(sigma_high_res_chunk) / np.median(sigma_high_res_chunk)
-            # Rule of thumb: CV < 0.05-0.10 means "approximately constant"
-            # print(f"CV low res: {cv_low_res}, CV high res: {cv_high_res}")
-
-            # Fractional spread within chunk
-            spread_low = (np.max(sigma_low_res_chunk) - np.min(sigma_low_res_chunk)) / np.median(sigma_low_res_chunk)
-            spread_high = (np.max(sigma_high_res_chunk) - np.min(sigma_high_res_chunk)) / np.median(sigma_high_res_chunk)
-            # print(f"Spread low res: {spread_low}, Spread high res: {spread_high}")
-            #
-
             if sigma_kernel_sq > const.EPS:
-                #TD: remove testing
-                # print(f"sigma_kernel_sq: {sigma_kernel_sq}", flush=True)
-                n_smoothed += 1
-                #
                 sigma_pix = np.sqrt(sigma_kernel_sq) / wavelength_step # dimensionless
                 temp_blurred = gaussian_filter1d(flux_high_res, sigma=sigma_pix) # this preserves nans (but we use finite mask anyway)
 
                 # only change indices within chunk that have finite flux (preserve nans)
                 blurred[high_res_finite_flux_chunk_mask] = temp_blurred[high_res_finite_flux_chunk_mask]
                 new_sigma_high_res[high_res_finite_flux_chunk_mask] = sigma_low_res_median
-            #TD: remove testing
             else:
-                # print(f"too small sigma_kernel_sq: {sigma_kernel_sq}")
-                # print(f"\tNo blurring applied in chunk {i+1}", flush=True)
-            #
                 # only change indices within chunk that have finite flux (preserve nans)
                 new_sigma_high_res[high_res_finite_flux_chunk_mask] = sigma_high_res_arr[high_res_finite_flux_chunk_mask]
-                n_ignored += 1
         else:
             raise ValueError("No low_res coverage in this chunk. This should never happen.")
         lam_min = lam_max
-        i += 1
     
     non_finite_sig = ~np.isfinite(new_sigma_high_res)
     non_finite_flux = ~np.isfinite(flux_high_res)
     if np.any(non_finite_sig != non_finite_flux):
         raise ValueError("New_sigma_high_res contains non-finite values where flux is finite")
     new_fwhm_high_res = new_sigma_high_res * const.SIGMA_TO_FWHM
-    #TD: remove testing
-    # print(f"\n\nnew 'high' res - old high res average: {np.mean(new_fwhm_high_res) - np.mean(fwhm_high_res):.2f}")
-    # print("(should be greater than 0 (decreasing resolving power increases FWHM values))")
-    # print(f"new 'high' res - old low res average: {np.mean(new_fwhm_high_res) - np.mean(fwhm_low_res):.2f}")
-    # print("(should be close to 0)\n\n")
-    #
+
     return blurred, new_fwhm_high_res
 
 def gaussian_blur_after_resampling(
@@ -230,7 +182,6 @@ def gaussian_blur_after_resampling(
     high_resolving_power: np.ndarray | float, 
     lam: np.ndarray,
     flux_high_res: np.ndarray, 
-    # n_chunks: int = 20
     chunk_width: float = const.VEL_BLUR_BIN_WIDTH, # km/s
     chunk_width_is_vel: bool = True
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -277,13 +228,10 @@ def gaussian_blur_after_resampling(
     sigma_kernel_arr = np.sqrt(sigma_diff_sq)
     
     blurred = flux_high_res.copy()
-    # chunk_size = int(np.ceil(len(lam) / n_chunks))
-    # for i in range(n_chunks):
-    #     start = i * chunk_size
-    #     end = start + chunk_size
-    i = 0
-    lam_min = np.nanmin(lam)
+    lam_min = lam[0] # assumes lam is sorted and finite
+
     while lam_min < lam[-1]:
+        # get (lam_min, lam_max) bounds for this chunk
         if chunk_width_is_vel:
             lam_centre = get_lam_centre(lam_min, vel=-chunk_width / 2)
             lam_max = convert_vel_to_lam(chunk_width / 2, lam_centre=lam_centre)
@@ -294,7 +242,7 @@ def gaussian_blur_after_resampling(
         chunk_start_idx = np.searchsorted(lam, lam_min, side="left")
         chunk_end_idx = np.searchsorted(lam, lam_max, side="right") # assume this will only be used for slicing, otherwise could get index error
         
-        if 0 <len(lam) - chunk_end_idx <= 2:
+        if 0 < len(lam) - chunk_end_idx <= 2:
             warn_msg = (
                 f"End of blurring chunk is close to the end of the "
                 f"spectrum. Extending chunk indices ({chunk_start_idx} - "
@@ -302,6 +250,7 @@ def gaussian_blur_after_resampling(
                 f"{chunk_start_idx} - {len(lam)})."
             )
             warnings.warn(warn_msg)
+            # this prevents the next chunk from being only 1 or 2 pixels long
             chunk_end_idx = len(lam)
             lam_max = lam[-1]
         if chunk_end_idx - chunk_start_idx < 2:
@@ -309,6 +258,7 @@ def gaussian_blur_after_resampling(
         
         chunk_indices = np.arange(chunk_start_idx, chunk_end_idx)
 
+        # index locations of finite high res flux in this chunk
         finite_flux_chunk_mask = chunk_indices[np.isfinite(flux_high_res[chunk_indices])]
         
         sigma_pix = np.median(sigma_kernel_arr[chunk_indices]) / wavelength_step
@@ -323,7 +273,6 @@ def gaussian_blur_after_resampling(
         else: # keep original flux (already copied above)
             new_sigma_high_res[finite_flux_chunk_mask] = sigma_high_res[finite_flux_chunk_mask]
 
-        i += 1
         lam_min = lam_max
 
     non_finite_sig = ~np.isfinite(new_sigma_high_res)
