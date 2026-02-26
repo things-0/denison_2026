@@ -347,16 +347,18 @@ def fit_agn(
             hdu = fits.ImageHDU(comp, name=f'GAS_COMP_{k}')
             hdus.append(hdu)
 
-    # check if file already exists using os:
+    # check if outfile_dir exists, if not create it
+    if not outfile_dir.exists():
+        outfile_dir.mkdir(parents=True, exist_ok=True)
+
     outfile_suffix = f"_{outfile_suffix}" if outfile_suffix != "" else ""
     outfile_name = f"ppxf_components{outfile_suffix}.fits"
     outfile_path = outfile_dir / outfile_name
-    # outfile_path = os.path.join(outfile_dir, outfile_name)
+    # check if the outfile already exists, if so create a copy with a different name
     while outfile_path.is_file():
         warnings.warn(f"file {outfile_name} already exists. Attempting to create copy.")
         outfile_name = outfile_name[:-5] + "_cpy.fits"
         outfile_path = outfile_dir / outfile_name
-        # outfile_path = os.path.join(outfile_dir, outfile_name)
     fits.HDUList(hdus).writeto(outfile_path, overwrite=False)
     print(f"\n\nFits file written to {outfile_path}")
 
