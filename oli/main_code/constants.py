@@ -119,7 +119,7 @@ FIG_LAYOUT = "constrained"
 VEL_WIDTH_GAUSSIAN_FIT = VEL_PLOT_WIDTH
 
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent # "oli/"
 OUTPUT_DIR = ROOT_DIR / "output"
 DATA_DIR = ROOT_DIR / "data"
 PPXF_DATA_DIR = DATA_DIR / "ppxf_results"

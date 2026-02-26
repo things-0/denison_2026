@@ -240,7 +240,6 @@ def get_bd_comparison_info(
     num_gaussians_bounds: tuple[int, int],
     vel_integration_width: float = const.VEL_TO_IGNORE_WIDTH,
     vel_gaussian_fit_width: float = const.VEL_WIDTH_GAUSSIAN_FIT,
-    vel_plot_width: float = const.VEL_PLOT_WIDTH,
     n_mc_trials: int = const.NUM_MC_TRIALS,
     print_progress: bool = False,
 ) -> tuple[list[list[dict[str, np.ndarray]]], list[int], list[int]]:
@@ -264,8 +263,6 @@ def get_bd_comparison_info(
         Velocity width of data to integrate over.
     vel_gaussian_fit_width: float
         Velocity width of data to include when fitting Gaussians.
-    vel_plot_width: float
-        Velocity width of data to plot.
     n_mc_trials: int
         Number of Monte Carlo trials to use for error estimation.
     print_progress: bool
@@ -309,7 +306,6 @@ def get_bd_comparison_info(
                 n_mc_trials=n_mc_trials,
                 vel_integration_width=vel_integration_width,
                 vel_gaussian_fit_width=vel_gaussian_fit_width,
-                vel_plot_width=vel_plot_width,
                 plot_curves=False
             )
             if np.any(bd_err < 0):
