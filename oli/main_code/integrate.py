@@ -84,6 +84,10 @@ def integrate_flux(
         sfd_trimmed = gauss_sfd_vals[new_integrate_width_mask]
         sfd_err_trimmed = gauss_sfd_errs[new_integrate_width_mask]
     else:
+        integrate_width_mask = np.where(
+            (lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(spec_flux_density))
+        ) if lam_bounds is not None else np.where(np.isfinite(spec_flux_density))
+
         if spec_flux_density.shape != lam.shape:
             raise ValueError("spec_flux_density and lam must have the same shape")
         if spec_flux_density_err is not None:
@@ -93,9 +97,6 @@ def integrate_flux(
         else:
             sfd_err_trimmed = None
 
-        integrate_width_mask = np.where(
-            (lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(spec_flux_density))
-        ) if lam_bounds is not None else np.where(np.isfinite(spec_flux_density))
         lam_trimmed = lam[integrate_width_mask]
         # integrate under actual flux values
         sfd_trimmed = spec_flux_density[integrate_width_mask]

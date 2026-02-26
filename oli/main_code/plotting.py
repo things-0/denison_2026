@@ -988,6 +988,7 @@ def plot_gaussians(
     red_chi_sq: float | None = None,
     save_fig_name: str | None = ""
 ) -> None:
+    #TODO: write docstring
     if mask_vel_width is not None:
         if mask_lam_centre is None:
             raise ValueError("mask_lam_centre must be provided if mask_vel_width is provided")
