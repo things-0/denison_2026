@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Any
+from pathlib import Path
 import os
 import warnings
 from astropy.io import fits
@@ -97,10 +98,29 @@ def edit_qsopar(
 def fits_is_equal(
     file_name_1: str,
     file_name_2: str = "qsopar0.fits",
-    folder: str = "pyqsofit_code/data/",
+    folder: Path = const.ROOT_DIR / "pyqsofit_code" / "data",
     ext_num: int = 1,
 ) -> bool:
-    with fits.open(folder + file_name_1, mode='readonly') as hdul1, fits.open(folder + file_name_2, mode='readonly') as hdul2:
+    """
+    Checks if the data in two FITS files are equal.
+
+    Parameters
+    ----------
+    file_name_1: str
+        The name of the first FITS file.
+    file_name_2: str
+        The name of the second FITS file.
+    folder: Path
+        The path to the folder containing the FITS files.
+    ext_num: int
+        The extension number of the data to compare.
+
+    Returns
+    -------
+    bool
+        True if the two FITS files are equal, False otherwise.
+    """
+    with fits.open(folder / file_name_1, mode='readonly') as hdul1, fits.open(folder / file_name_2, mode='readonly') as hdul2:
         data1 = hdul1[ext_num].data
         data2 = hdul2[ext_num].data
         return np.all(data1 == data2)

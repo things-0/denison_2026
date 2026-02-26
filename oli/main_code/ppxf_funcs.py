@@ -34,9 +34,12 @@ def assign_narrow_components(
     gas_names: list[str]
         The names of the gas lines to assign components to.
 
-    Returns:
-        component_list: List of component numbers (one per gas line)
-        max_component: Highest component number used
+    Returns
+    -------
+    component_list: list[int]
+        A list of component numbers (one per gas line)
+    max_component: int
+        The highest component number used
     """
     
     # Define groupings
@@ -368,7 +371,7 @@ def get_nl_and_stell_cont(
     infile: str = "ppxf_components",
     infile_suffix: str = "",
     infile_path: Path = const.PPXF_DATA_DIR,
-    nl_gas_comp_ids: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    nl_gas_comp_ids: list[int] = [1, 2, 3, 4],
     data_is_normalised: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
     if infile_suffix != "":
@@ -396,18 +399,20 @@ def get_ha_hb_comps(
     infile: str = "ppxf_components",
     infile_suffix: str = "",
     infile_path: Path = const.PPXF_DATA_DIR,
-    br_gas_comp_ids: list[int] = [10, 11, 12],
+    br_gas_comp_ids: list[int] = [5, 6, 7], #TODO: generalise to arbitrary number of narrow line components
     data_is_normalised: bool = True,
     vel_width: float = const.VEL_WIDTH_GAUSSIAN_FIT
 ) -> tuple[np.ndarray, np.ndarray]:
     if infile_suffix != "":
         infile_suffix = "_" + infile_suffix
     actual_infile = infile_path / (infile + infile_suffix + ".fits")
+
     with fits.open(actual_infile) as hdul:
         lam = hdul['WAVELENGTH'].data
 
         all_broad = np.zeros((len(br_gas_comp_ids), len(lam)))
         summed_broad = np.zeros_like(lam)
+
 
         for i, comp_id in enumerate(br_gas_comp_ids):
             comp_flux = hdul[f'GAS_COMP_{comp_id}'].data

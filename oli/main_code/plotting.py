@@ -839,8 +839,9 @@ def plot_diff_spectra_all(
     fill_between_opacity: float
         The opacity of the region to fill between.
     plot_centres_list: list[list[float] | float]
-        
     """
+    #TODO: fill in rest of docstring
+
     num_plots_options = [
         len(plot_centres_list), len(plot_labels_list),
         len(ions_list), len(n_ticks_x_list), len(scale_axes_list),
@@ -1045,6 +1046,30 @@ def compare_balmer_decrements( #TODO: overplot diff spectra (remove make_new_fig
     save_fig_name: str | None = "",
     **diff_kwargs: Any
 ) -> float | None:
+    """
+    Compares the balmer decrements for different numbers of Gaussians and velocity bins.
+    NOTE: This function is not yet implemented.
+
+    Parameters
+    ----------
+    results: list[list[dict[str, np.ndarray]]]
+        The results of the balmer decrement calculations. See
+        :func:`integrate.get_bd_comparison_info` for more details.
+    num_gaussians_list: list[int]
+        The number of Gaussians used for each calculation (inclusive).
+    num_bins_list: list[int]
+        The number of bins used for each calculation (inclusive).
+    year: int
+        The year of the data.
+    colour_map: Colormap
+        The colour map to use for the plots.
+    ylim: tuple[int, int]
+        The y-axis bounds of the plots.
+    save_fig_name: str | None
+        The name of the figure to save.
+    **diff_kwargs: Any
+        Additional keyword arguments to pass to :func:`plot_diff_spectra`.
+    """
     pass
 
 # def compare_balmer_decrements_old(
