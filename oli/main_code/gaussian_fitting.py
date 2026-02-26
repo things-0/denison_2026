@@ -371,12 +371,6 @@ def fit_gaussians(
         "mu_errs": mu_errs,
         "sigma_errs": sigma_errs
     }
-    return (
-        summed_y_vals, summed_y_errs, sep_y_vals,
-        red_chi_sq, fwhm_mean, fwhm_err,
-        (heights, mus, sigmas),
-        (height_errs, mu_errs, sigma_errs)
-    )
 
 def get_mc_errs_perturb_y(
     x: np.ndarray,

@@ -257,9 +257,9 @@ def fit_agn(
         bounds.append([(-500, 500), (50, 400)])
     
     # Broad Balmer components (wider velocity and dispersion ranges)
-    bounds.append([(-2000, 2000), (500, 5000)])     # Broad 1
-    bounds.append([(-2000, 2000), (1000, 3500)])   # Broad 2  
-    bounds.append([(-2000, 2000), (1000, 35000)])   # Broad 3
+    bounds.append([(-2000, 2000), (500, 2000)])     # Broad 1 # sigma was (500, 5000)
+    bounds.append([(-2000, 2000), (1000, 3500)])   # Broad 2  # sigma was (1000, 10000)
+    bounds.append([(-2000, 2000), (1000, 3500)])   # Broad 3  # sigma was (1000, 10000)
  
 
         
@@ -349,6 +349,8 @@ def fit_agn(
 
     # check if outfile_dir exists, if not create it
     if not outfile_dir.exists():
+        warn_msg = f"outfile_dir {outfile_dir} does not exist. Creating it."
+        warnings.warn(warn_msg)
         outfile_dir.mkdir(parents=True, exist_ok=True)
 
     outfile_suffix = f"_{outfile_suffix}" if outfile_suffix != "" else ""

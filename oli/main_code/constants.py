@@ -99,7 +99,7 @@ HEIGHT_MAX = 10
 DEFAULT_NUM_GAUSSIANS = 2
 
 # Plotting parameters
-SAVE_FIGS = False
+SAVE_FIGS = True
 PLOT_TITLES = not SAVE_FIGS
 VEL_PLOT_WIDTH = 3 * VEL_TO_IGNORE_WIDTH
 LINEWIDTH = 1.5
@@ -152,6 +152,8 @@ OIII_BLUE_LATEX = r"[OIII]$\lambda$4959"
 OIII_RED_LATEX = r"[OIII]$\lambda$5007"
 SII_BLUE_LATEX = r"[SII]$\lambda$6718"
 SII_RED_LATEX = r"[SII]$\lambda$6733"
+NII_BLUE_LATEX = r"[NII]$\lambda$6549"
+NII_RED_LATEX = r"[NII]$\lambda$6584"
 
 # From 2021 "The SAMI Galaxy Survey: the third and final data release"
 """
