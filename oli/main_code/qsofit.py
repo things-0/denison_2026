@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Any
+from pathlib import Path
 import os
 import warnings
 from astropy.io import fits
@@ -21,6 +22,32 @@ def edit_qsopar(
     make_copy: bool = True,
     print_change: bool = True
 ) -> None:
+    """
+    Edits a value in the qsopar file.
+
+    Parameters
+    ----------
+    file_name: str
+        The name of the qsopar file.
+    value_name_to_edit: str
+        The name of the value to edit.
+    new_value: Any
+        The new value to set.
+    col_name_and_val: tuple[str, Any] | None
+        The column name and value to match.
+    mask: np.ndarray | None
+        The mask used to locate the data to edit. Should only be
+        provided if col_name_and_val is None.
+    folder_name: str
+        The name of the folder containing the qsopar file.
+    ext_num: int
+        The extension number of the hdulist to edit in the qsopar file.
+    make_copy: bool
+        Whether to make a copy of the edited qsopar file or save changes
+        to the original file.
+    print_change: bool
+        Whether to print the changes made.
+    """
     try:
         with fits.open(folder_name + file_name, mode=('readonly' if make_copy else 'update')) as hdul:
 
@@ -71,10 +98,29 @@ def edit_qsopar(
 def fits_is_equal(
     file_name_1: str,
     file_name_2: str = "qsopar0.fits",
-    folder: str = "pyqsofit_code/data/",
+    folder: Path = const.ROOT_DIR / "pyqsofit_code" / "data",
     ext_num: int = 1,
 ) -> bool:
-    with fits.open(folder + file_name_1, mode='readonly') as hdul1, fits.open(folder + file_name_2, mode='readonly') as hdul2:
+    """
+    Checks if the data in two FITS files are equal.
+
+    Parameters
+    ----------
+    file_name_1: str
+        The name of the first FITS file.
+    file_name_2: str
+        The name of the second FITS file.
+    folder: Path
+        The path to the folder containing the FITS files.
+    ext_num: int
+        The extension number of the data to compare.
+
+    Returns
+    -------
+    bool
+        True if the two FITS files are equal, False otherwise.
+    """
+    with fits.open(folder / file_name_1, mode='readonly') as hdul1, fits.open(folder / file_name_2, mode='readonly') as hdul2:
         data1 = hdul1[ext_num].data
         data2 = hdul2[ext_num].data
         return np.all(data1 == data2)

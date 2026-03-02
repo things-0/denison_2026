@@ -5,16 +5,19 @@ import astropy.io.fits as fits
 import ppxf.ppxf_util as util
 from PyAstronomy import pyasl
 
-#TODO: remove testing
-import matplotlib.pyplot as plt
-#
-
 from pathlib import Path
 import warnings
 
 from . import constants as const
-from .adjust_calibration import gaussian_blur_before_resampling, gaussian_blur_after_resampling, clip_sami_blue_edge
-from .helpers import remove_or_replace_bad_values, get_velscale, get_good_pixels, combine_sami_vals, set_all_values, assert_lengths_match
+from .adjust_calibration import (
+    gaussian_blur_before_resampling,
+    gaussian_blur_after_resampling, clip_sami_blue_edge
+)
+from .helpers import (
+    remove_or_replace_bad_values, get_velscale,
+    get_good_pixels, combine_sami_vals, set_all_values,
+    assert_lengths_match
+)
 from .plotting import plot_min_res, plot_spectra
 
 def get_sami_data(
@@ -25,10 +28,9 @@ def get_sami_data(
     lam_bounds: tuple[float, float] | None = const.TOTAL_LAM_BOUNDS,
     rm_or_replace_outside_lam_bounds: bool | float = True,
     rm_or_replace_other_bad_values: bool | float = np.nan,
-    z: float = const.Z_SPEC, # use 0 to get observed frame data
+    z: float = const.Z_SPEC,
     perform_log_rebin: bool = False,
     resolving_power: float | np.ndarray | None = None,
-    # plot_as_is: bool = False, #TODO: remove testing
 ) -> dict[str, np.ndarray]:
     """
     Get relevant data from the SAMI spectrum.
@@ -74,7 +76,7 @@ def get_sami_data(
 
         lam_indices = np.arange(1, num_pixels_axis_1+0.5)                           # (fits coordinates are 1-indexed)
         lam_0 = coord_ref_val_axis_1 - coord_ref_pix_axis_1 * coord_delta_axis_1    # λ_0 = λ_ref - num_pixels_from_start * dλ        
-        lam_obs = lam_0 + lam_indices * coord_delta_axis_1                            # λ_obs = λ_0 + index * dλ
+        lam_obs = lam_0 + lam_indices * coord_delta_axis_1                          # λ_obs = λ_0 + index * dλ
         lam_rest = lam_obs / (1 + z)  # lam_rest is actually lam_obs if you set z=0
 
         if np.any(~np.isfinite(lam_rest)):
@@ -88,7 +90,7 @@ def get_sami_data(
 
     if lam_medium[0] == "air" and lam_medium[1] == "vacuum":
         lam_rest = util.air_to_vac(lam_rest)
-        # lam_rest = pyasl.airtovac2(lam_rest)
+        # lam_rest = pyasl.airtovac2(lam_rest) # alternative function
     elif lam_medium[0] == "vacuum" and lam_medium[1] == "air":
         lam_rest = util.vac_to_air(lam_rest)
     elif not set(lam_medium).issubset({"air", "vacuum"}):
@@ -96,21 +98,6 @@ def get_sami_data(
 
     flux *= 10 ** (flux_power_of_10 - 16)
     err *= 10 ** (flux_power_of_10 - 16)
-
-    #TODO: remove testing
-    # if plot_as_is:
-    #     x_bounds = get_lam_bounds(const.H_ALPHA, const.VEL_PLOT_WIDTH, width_is_vel=True)
-    #     lam_of_max_flux = lam_rest[np.nanargmax(flux)]
-    #     plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
-    #     plt.plot(lam_rest, flux)
-    #     plt.fill_between(lam_rest, flux - err, flux + err, color='lightgrey')
-    #     plt.xlim(x_bounds)
-    #     plt.axvline(lam_of_max_flux, color='red', linestyle='--', label=f'max flux 2015 {lam_of_max_flux:.2f} Å = {np.nanmax(flux):.2f}')
-    #     plt.ylim(0, 110)
-    #     plt.title("SAMI spectrum before filtering")
-    #     plt.legend()
-    #     plt.show()
-    #
 
     if perform_log_rebin:       # necessary for pPXF fitting
         lam_range = [lam_rest[0], lam_rest[-1]]
@@ -126,7 +113,7 @@ def get_sami_data(
     if resolving_power is not None:
         fwhm_per_pix = lam_rest / resolving_power
     else:
-        warn_msg = "Resolving power data not provided. Setting fwhm_per_pix to None."
+        warn_msg = "Resolving power not provided. Setting fwhm_per_pix to None."
         warnings.warn(warn_msg)
         fwhm_per_pix = None
     
@@ -162,8 +149,7 @@ def get_sdss_data(
     lam_bounds: tuple[float, float] | None = const.TOTAL_LAM_BOUNDS,
     rm_or_replace_outside_lam_bounds: bool | float = True,
     rm_or_replace_other_bad_values: bool | float = np.nan,
-    z: float = const.Z_SPEC, # use 0 to get observed frame data
-    # plot_as_is: bool = False, #TODO: remove testing
+    z: float = const.Z_SPEC,
 ) -> dict[str, np.ndarray]:
     """
     Get relevant data from the SDSS spectrum.
@@ -223,24 +209,6 @@ def get_sdss_data(
     lam_obs = 10**log_lam_obs
     lam_rest = lam_obs / (1 + z)
 
-    # ln_lam_obs = log_lam_obs * np.log(10)
-    # ln_lam_rest = ln_lam_obs - np.log(1 + z)
-
-    #TODO: remove testing
-    # if plot_as_is:
-    #     x_bounds = get_lam_bounds(const.H_ALPHA, const.VEL_PLOT_WIDTH, width_is_vel=True)
-    #     lam_of_max_flux = lam_rest[np.nanargmax(flux)]
-    #     plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
-    #     plt.plot(lam_rest, flux)
-    #     plt.fill_between(lam_rest, flux - flux_err, flux + flux_err, color='lightgrey')
-    #     plt.xlim(x_bounds)
-    #     plt.axvline(lam_of_max_flux, color='red', linestyle='--', label=f'max flux 2001 {lam_of_max_flux:.2f} Å = {np.nanmax(flux):.2f}')
-    #     plt.ylim(0, 110)
-    #     plt.title("SDSS spectrum before filtering")
-    #     plt.legend()
-    #     plt.show()
-    #
-
     if np.any(~np.isfinite(lam_rest)):
         raise ValueError("Lam has nans")
 
@@ -262,15 +230,6 @@ def get_sdss_data(
     else:
         fwhm_per_pix = wresl
 
-    # d_ln_lam_rest = (ln_lam_rest[-1] - ln_lam_rest[0])/(len(ln_lam_rest) - 1) # average spacing between ln wavelengths
-    # velscale = const.C_KM_S*d_ln_lam_rest  
-    #TODO: remove testing
-    # plt.plot(lam_rest, fwhm_per_pix)
-    # plt.ylim(bottom=0)
-    # plt.title("FWHM per pixel before filtering")
-    # plt.show()
-    #
-
     filtered_data = remove_or_replace_bad_values(
         lam=lam_rest,
         flux=flux,
@@ -280,12 +239,6 @@ def get_sdss_data(
         rm_or_replace_outside_lam_bounds=rm_or_replace_outside_lam_bounds,
         rm_or_replace_other_bad_values=rm_or_replace_other_bad_values
     )
-    #TODO: remove testing
-    # plt.plot(lam_rest, fwhm_per_pix)
-    # plt.ylim(bottom=0)
-    # plt.title("FWHM per pixel after filtering")
-    # plt.show()
-    #
 
     velscale = get_velscale(filtered_data["lam"])
     good_pixels = np.where(filtered_data["good_mask"])[0]
@@ -301,15 +254,6 @@ def get_sdss_data(
         "good_pixels": good_pixels,
         "velscale": velscale
     }
-
-#TODO: return all of this (resampled/blurred if necessary - maybe use dictionary instead?)
-#     data["flux"],
-#     data["flux_error"],
-#     data["median_flux"],
-#     data["lam"],
-#     data["fwhm_per_pix"],
-#     data["good_pixels"],
-#     data["velscale"]
 
 def get_adjusted_data(
     blur_step: int = 1,
@@ -446,33 +390,6 @@ def get_adjusted_data(
         input_data01["velscale"], input_data15_blue["velscale"],
         input_data15_red["velscale"], input_data21["velscale"], input_data22["velscale"]
     )
-
-    #TODO: remove testing
-    # plt.plot(lam01, fwhm01)
-    # plt.ylim(bottom=0)
-    # plt.title("FWHM per pixel for 2001")
-    # plt.show()
-
-    # plt.plot(lam15_blue, fwhm15_blue)
-    # plt.ylim(bottom=0)
-    # plt.title("FWHM per pixel for 2015 blue")
-    # plt.show()
-
-    # plt.plot(lam15_red, fwhm15_red)
-    # plt.ylim(bottom=0)
-    # plt.title("FWHM per pixel for 2015 red")
-    # plt.show()
-
-    # plt.plot(lam21, fwhm21)
-    # plt.ylim(bottom=0)
-    # plt.title("FWHM per pixel for 2021")
-    # plt.show()
-
-    # plt.plot(lam22, fwhm22)
-    # plt.ylim(bottom=0)
-    # plt.title("FWHM per pixel for 2022")
-    # plt.show()
-    #
 
     target_sdss_len = len(lam01)
     for sdss_arr in [lam01, lam21, lam22, flux01, flux21, flux22, err01, err21, err22, fwhm01, fwhm21, fwhm22]:

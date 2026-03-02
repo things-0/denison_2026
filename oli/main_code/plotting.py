@@ -4,7 +4,8 @@ import matplotlib.ticker as ticker
 from matplotlib.colors import Colormap
 import numpy as np
 import warnings
-import os
+from pathlib import Path
+
 from typing import Any
 
 from . import constants as const
@@ -13,10 +14,30 @@ from .helpers import (
     get_scaled_y_bounds, get_lam_mask, get_better_y_bounds
 )
 
-def my_savefig(save_fig_name: str | None, fig: plt.Figure | None = None) -> None:
+def my_savefig(
+    save_fig_name: str | None,
+    fig: plt.Figure | None = None,
+    output_dir: Path = const.OUTPUT_DIR
+) -> None:
+    """
+    Save a figure to the output directory.
+
+    Parameters
+    ----------
+    save_fig_name: str | None
+        The name of the figure to save.
+    fig: plt.Figure | None
+        The figure object to save. If None, the current figure is used.
+    """
     my_fig = plt.gcf() if fig is None else fig
-    # my_fig.tight_layout()
+    # my_fig.tight_layout() # use "constrained" instead when first creating the figure
     if const.SAVE_FIGS and save_fig_name is not None and save_fig_name != "":
+        # check if output_dir exists, if not create it
+        if not output_dir.exists():
+            warn_msg = f"output_dir {output_dir} does not exist. Creating it."
+            warnings.warn(warn_msg)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
         prefix_suffix = save_fig_name.split(".")
         if len(prefix_suffix) < 2:
             save_fig_name += ".pdf"
@@ -24,11 +45,11 @@ def my_savefig(save_fig_name: str | None, fig: plt.Figure | None = None) -> None
             raise ValueError("too many . in save_fig_name")
         elif prefix_suffix[1] != "pdf":
             save_fig_name = prefix_suffix[0] + ".pdf"
-        while os.path.exists(const.FIG_OUTPUT_DIR + save_fig_name):
-            warn_msg = f"{const.FIG_OUTPUT_DIR + save_fig_name} already exists. Creating copy"
+        while (output_dir / save_fig_name).exists():
+            warn_msg = f"{output_dir / save_fig_name} already exists. Creating copy"
             warnings.warn(warn_msg)
             save_fig_name = save_fig_name[:-4] + "_cpy.pdf"
-        my_fig.savefig(const.FIG_OUTPUT_DIR + save_fig_name)
+        my_fig.savefig(output_dir / save_fig_name)
             
 
 def plot_vert_emission_lines(
@@ -47,7 +68,8 @@ def plot_vert_emission_lines(
     Parameters
     ----------
     ions: dict[str, float]
-        The ions to plot. Each key is the line label, and each value is the rest wavelength of the line.
+        The ions to plot. Each key is the line label, and each value is the rest wavelength of the
+        line. E.g. {"Hα": 6564.61, "Hβ": 4862.68}.
     plot_x_bounds: tuple[float, float] | None
         The x-axis limits of the plot.
     fill_between_bounds: tuple[float, float] | None
@@ -99,7 +121,29 @@ def plot_min_res(
     save_fig_name: str | None = "min_res.pdf"
 ) -> None:
     """
-    Plot the coverage of the resolution of the spectra.
+    Plot the resolving power and coverage of the spectra.
+
+    Parameters
+    ----------
+    lam_sdss: np.ndarray
+        The wavelength of the SDSS spectra.
+    lam15_blue: np.ndarray
+        The wavelength of the blue arm of the 2015 SAMI spectra.
+    lam15_red: np.ndarray
+        The wavelength of the red arm of the 2015 SAMI spectra.
+    res_min: np.ndarray
+        The minimum resolving power of the spectra.
+    res01: np.ndarray
+        The resolving power of the 2001 SDSS spectra.
+    res21: np.ndarray
+        The resolving power of the 2021 SDSS spectra.
+    res22: np.ndarray
+        The resolving power of the 2022 SDSS spectra.
+    plot_RES_15_RED: bool
+        If True, plot the resolving power of the red arm of the 2015 SAMI spectra.
+        Note: this is much larger than all other resolving powers.
+    save_fig_name: str | None
+        The name of the figure to save.
     """
 
     lam15_blue_min = np.min(lam15_blue)
@@ -170,6 +214,73 @@ def plot_spectra(
     legend_loc: str | None = "best",
     save_fig_name: str | None = ""
 ) -> None:
+    """
+    Plots the spectra from 2001 to 2022.
+
+    Parameters
+    ----------
+    lam01: np.ndarray
+        The wavelength of the 2001 SDSS spectra.
+    lam15: np.ndarray | tuple[np.ndarray, np.ndarray]
+        The wavelength of the 2015 SAMI spectra, or a tuple of the
+        wavelength arrays of the blue and red arms, respectively.
+    lam21: np.ndarray
+        The wavelength of the 2021 SDSS spectra.
+    lam22: np.ndarray
+        The wavelength of the 2022 SDSS spectra.
+    flux01: np.ndarray
+        The flux of the 2001 SDSS spectra.
+    flux15: np.ndarray | tuple[np.ndarray, np.ndarray]
+        The flux of the 2015 SAMI spectra, or a tuple of the
+        flux arrays of the blue and red arms, respectively.
+    flux21: np.ndarray
+        The flux of the 2021 SDSS spectra.
+    flux22: np.ndarray
+        The flux of the 2022 SDSS spectra.
+    plot_errors: bool
+        If True, plot the flux errors as ± shaded regions.
+    flux01_err: np.ndarray | None
+        The flux errors of the 2001 SDSS spectra.
+    flux15_err: np.ndarray | tuple[np.ndarray, np.ndarray] | None
+        The flux errors of the 2015 SAMI spectra, or a tuple of the
+        flux error arrays of the blue and red arms, respectively.
+    flux21_err: np.ndarray | None
+        The flux errors of the 2021 SDSS spectra.
+    flux22_err: np.ndarray | None
+        The flux errors of the 2022 SDSS spectra.
+    title: str | None
+        The title of the plot.
+    y_axis_label: str
+        The label of the y-axis.
+    x_axis_label: str
+        The label of the x-axis.
+    error_opacity: float
+        The opacity of the flux error regions.
+    ions: dict[str, float] | None
+        The ions to plot. Each key is the line label, and each value is the
+        rest wavelength of the line. E.g. {"Hα": 6564.61, "Hβ": 4862.68}.
+    x_bounds: tuple[float, float] | None
+        The x-axis limits of the plot.
+    y_bounds: tuple[float, float] | None
+        The y-axis limits of the plot. These will be adjusted to sensibly fit the
+        data if this is not already the case. See :func:`get_better_y_bounds`.
+    fill_between_bounds: tuple[float, float] | None
+        The x-axis limits of the region to fill between with light grey.
+    fill_between_label: str | None
+        The label of the region to fill between.
+    fill_between_opacity: float
+        The opacity of the region to fill between.
+    y_offset: float
+        When plotting each spectrum, the flux of the entire spectrum will be increased
+        by a multiple of this value to separate them. Set to 0 to plot the actual
+        values of each spectrum.
+    figsize: tuple[float, float]
+        The size of the figure (x, y) in inches.
+    legend_loc: str | None
+        The location of the legend.
+    save_fig_name: str | None
+        The name of the figure to save.
+    """
     
     flux01_os = flux01
     flux21_os = flux21 + 2 * y_offset
@@ -184,14 +295,11 @@ def plot_spectra(
         flux15_blue, flux15_red = flux15
         lam15_blue, lam15_red = lam15
 
-        #TODO: remove testing
-        # lam_of_max_flux = lam15_red[np.nanargmax(flux15_red)]
-        # plt.axvline(lam_of_max_flux, color='coral', alpha=0.3, linestyle='--', label=f'max flux 2015 {lam_of_max_flux:.2f} Å = {np.nanmax(flux15_red):.2f}')
-        #
-
         flux15_blue_os, flux15_red_os = flux15_blue + y_offset, flux15_red + y_offset
         flux15_os = (flux15_blue_os, flux15_red_os)
 
+        #TODO: change colours to blue and red (and sdss to different colours) (not just for this function) 
+        # - maybe set these colours in constants.py?
         plt.plot(lam15_blue, flux15_blue_os, color='turquoise', label='2015 blue arm (SAMI)', lw = const.LINEWIDTH)
         plt.plot(lam15_red, flux15_red_os, color='coral', label='2015 red arm (SAMI)', lw = const.LINEWIDTH)
     else:
@@ -201,12 +309,6 @@ def plot_spectra(
 
     plt.plot(lam21, flux21_os, color='red', label='2021 (SDSS)', lw = const.LINEWIDTH)
     plt.plot(lam22, flux22_os, color='blue', label='2022 (SDSS)', lw = const.LINEWIDTH)
-
-    #TODO: remove testing
-    # lam_of_max_flux = lam01[np.nanargmax(flux01)]
-    # plt.axvline(lam_of_max_flux, color='orange', label=f'max flux 2001 {lam_of_max_flux:.2f} Å = {np.nanmax(flux01):.2f}')
-    # plt.axvline(lam_of_max_flux, color='darkgreen', linestyle='--', label=f'old max flux 2001 {6563.45} Å = {87.18}')
-    #
 
     if plot_errors:
         if flux01_err is not None:
@@ -269,6 +371,42 @@ def plot_polynomial_ratio(
     plot_selection: bool = False,
     save_fig_name: str | None = ""
 ) -> None:
+    """
+    Plot the flux ratio of a particular spectrum and the spectrum (2015)
+    used for recalibration.
+
+    Parameters
+    ----------
+    lambdas: np.ndarray
+        The wavelengths of the spectra.
+    vals: np.ndarray
+        The actual ratio of flux between the two epochs (excluding values to
+        be ignored when fitting the polynomial - i.e. Balmer lines. These are
+        plotted separately as `vals_removed`).
+    polynom_vals: np.ndarray | None
+        The values of the polynomial fit to the flux ratio.
+    binned_lambdas: np.ndarray | None
+        The wavelengths of the binned flux ratio.
+    binned_vals: np.ndarray | None
+        The binned flux ratio. See :func:`helpers.bin_data_by_median`.
+    vals_removed: np.ndarray | None
+        The actual ratio of flux between the two epochs in wavelength regions
+        where the Balmer lines are ignored for the polynomial fit.
+    degree: float
+        The degree of the polynomial fit.
+    bin_width: float
+        The width of the `binned_vals` bins (angstroms).
+    bin_by_med: bool
+        If True, the polynomial was fit to the binned flux ratio, else to the
+        the actual flux ratio.
+    title: str | None
+        The title of the plot.
+    plot_selection: bool
+        If True, plots `vals_removed` but not `polynom_vals`. Else, `polynom_vals`
+        is plotted and `vals_removed` is not.
+    save_fig_name: str | None
+        The name of the figure to save.
+    """
     plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
     
     if bin_by_med:
@@ -307,6 +445,41 @@ def plot_adjusted_spectrum(
     title: str | None = None,
     save_fig_name: str | None = ""
 )-> None:
+    """
+    Plot the adjusted spectrum against the unadjusted and baseline (2015) spectra.
+
+    Parameters
+    ----------
+    lam: np.ndarray
+        The wavelengths of the spectra.
+    adjusted_lam: np.ndarray
+        The wavelengths of the adjusted spectrum. This may be the same as `lam`,
+        or it may be trimmed if the unadjusted spectrum wavelength range extended
+        beyond the baseline spectrum wavelength range and no extrapolation was
+        performed.
+    baseline_flux: np.ndarray
+        The flux of the baseline (2015) spectrum.
+    unadjusted_flux: np.ndarray
+        The flux of the unadjusted spectrum.
+    adjusted_flux: np.ndarray
+        The flux of the spectrum to adjust after applying the polynomial fit.
+    year_to_adjust: int
+        The year of the spectrum to adjust.
+    baseline_year: int
+        The year of the baseline (2015) spectrum.
+    ions: dict[str, float] | None
+        The ions to plot. Each key is the line label, and each value is the
+        rest wavelength of the line. E.g. {"Hα": 6564.61, "Hβ": 4862.68}.
+    lam_bounds: tuple[float] | None
+        The wavelength bounds of the plot.
+    flux_y_bounds: tuple[float] | None
+        The flux bounds of the plot. These will be adjusted to sensibly fit the
+        data if this is not already the case. See :func:`get_better_y_bounds`.
+    title: str | None
+        The title of the plot.
+    save_fig_name: str | None
+        The name of the figure to save.
+    """
     plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
     plt.plot(lam, baseline_flux, color='black', label=f'{baseline_year}', lw = 0.7*const.LINEWIDTH)
     plt.plot(lam, unadjusted_flux, color='orange', label=f'{year_to_adjust}', lw = 0.7*const.LINEWIDTH)
@@ -356,6 +529,69 @@ def plot_diff_spectra_one_fig(
     colour_map: Colormap = const.COLOUR_MAP,
     n_ticks_x: int | None = None
 ) -> tuple[str, str | None, str]:
+    """
+    Plots some or all of the 2015, 2021, and 2022 difference (from 2001) spectra
+    onto a single (sub)figure.
+
+    Parameters
+    ----------
+    fig: plt.Figure
+        The figure to plot the spectra onto.
+    lam: np.ndarray
+        The wavelengths of the spectra.
+    diff_15: np.ndarray | None
+        The flux density of the 2015 - 2001 difference spectrum.
+    diff_21: np.ndarray | None
+        The flux density of the 2021 - 2001 difference spectrum.
+    diff_22: np.ndarray | None
+        The flux density of the 2022 - 2001 difference spectrum.
+    diff_15_err: np.ndarray | None
+        The error of the flux density of the 2015 - 2001 difference spectrum.
+    diff_21_err: np.ndarray | None
+        The error of the flux density of the 2021 - 2001 difference spectrum.
+    diff_22_err: np.ndarray | None
+        The error of the flux density of the 2022 - 2001 difference spectrum.
+    ions: dict[str, float] | bool
+        The ions to plot. Each key is the line label, and each value is the
+        rest wavelength of the line. E.g. {"Hα": 6564.61, "Hβ": 4862.68}.
+        Default values according to `plot_centres` will be used if True.
+    vel_plot_width: float | None
+        The width of the plot in velocity units.
+    hlines: dict[str, float] | None
+        The horizontal lines to plot. Each key is the line label, and each value is the
+        value of the line. E.g. {"1 σ": 20.0, "2 σ": 25.0}.
+    fill_between_bounds: tuple[float, float] | None
+        The bounds of the region to fill between with light grey.
+    fill_between_label: str | None
+        The label of the region to fill between.
+    fill_between_opacity: float
+        The opacity of the region to fill between.
+    plot_centres: float | list[float]
+        If a single number, this is the centre wavelength (or 0 km/s velocity) of the plot.
+        If a list, different sections of the spectrum will be overplotted on the same
+        velocity scale each with their own centre wavelength set to 0 km/s.
+    plot_labels: list[str] | None
+        Dictates the prefix of the epoch legend labels, and, if `scale_axes` is True,
+        the y-axis labels of the plot.
+    use_ang_x_axis: bool
+        If True, the x-axis is in angstroms, else it is in km/s.
+    plot_y_bounds: tuple[float, float] | bool
+        If a tuple, the y-axis bounds of the plot. If True, the y-axis bounds are
+        set according to the `plot_centre` (if it is a single number), else,
+        :class:`matplotlib.pyplot` sets the bounds automatically.
+    scale_axes: bool
+        If True and `plot_centres` is a list of length 2, the y-axis is scaled to the
+        same bounds for all plots such that their maxima and 0 fluxes are aligned.
+        See :func:`get_scaled_y_bounds` for more details.
+    y_top_scale_factor: float
+        The factor that the max of y2 will be scaled by to create the top of the second axis.
+    error_opacity: float
+        The opacity of the error regions.
+    colour_map: Colormap
+        The colour map to use for the separate epochs and plot centres.
+    n_ticks_x: int | None
+        The number of major ticks on the x-axis.
+    """
 
     if isinstance(plot_centres, list) and plot_labels is not None and len(plot_centres) != len(plot_labels):
         raise ValueError("plot_centres and plot_labels must have the same length and correspond to each other")
@@ -404,7 +640,7 @@ def plot_diff_spectra_one_fig(
     if diffs_22 is not None:
         all_diffs.append(diffs_22)
         all_years.append(2022)
-    if scale_axes: #TODO: finish setting up plot parameters
+    if scale_axes:
         if not isinstance(plot_y_bounds, bool) or plot_y_bounds == True:
             raise ValueError("plot_y_bounds must be False if using scale_axes")
         if len(all_diffs) != 1:
@@ -421,10 +657,9 @@ def plot_diff_spectra_one_fig(
             )
             ax1.set_ylim(y_bounds_1)
             ax2.set_ylim(y_bounds_2)
-            # ax1.set_xlabel(x_axis_label)
 
         else:
-            raise ValueError("scale_axes is only supported for 2 centres")
+            raise NotImplementedError("scale_axes is only supported for 2 centres")
     else:
         # plt.xlabel(x_axis_label)
         axes = [fig.add_subplot()]
@@ -462,8 +697,17 @@ def plot_diff_spectra_one_fig(
 
     if isinstance(ions, bool):
         if ions:
-            ions_near_h_alpha = {r"H${\alpha}$": const.H_ALPHA, "S[II] (blue)": const.SII_BLUE, "S[II] (red)": const.SII_RED, "N[II] (strong)": const.NII_STRONG}
-            ions_near_h_beta = {r"H${\beta}$": const.H_BETA, "O[III] (weak)": const.OIII_WEAK, "O[III] (strong)": const.OIII_STRONG}
+            ions_near_h_alpha = {
+                const.HA_LATEX: const.H_ALPHA,
+                const.SII_BLUE_LATEX: const.SII_BLUE,
+                const.SII_RED_LATEX: const.SII_RED,
+                const.NII_RED_LATEX: const.NII_RED
+            }
+            ions_near_h_beta = {
+                const.HB_LATEX: const.H_BETA,
+                const.OIII_BLUE_LATEX: const.OIII_BLUE,
+                const.OIII_RED_LATEX: const.OIII_RED
+            }
             if isinstance(plot_centres, list):
                 ions = {}
                 if const.H_ALPHA in plot_centres:
@@ -543,7 +787,7 @@ def plot_diff_spectra_all(
         {const.HA_LATEX: const.H_ALPHA}
     ],
     vel_plot_width: float | None = const.VEL_PLOT_WIDTH,
-    hlines: dict[str, float] | None = None,
+    hlines_list: list[dict[str, float] | None] = [None, None],
     fill_between_bounds: tuple[float, float] | None = None,
     fill_between_label: str | None = None,
     fill_between_opacity: float = const.FILL_BETWEEN_OPAC,
@@ -560,10 +804,48 @@ def plot_diff_spectra_all(
     save_fig_name: str | None = "",
     figsize: tuple[float, float] = const.FIG_SIZE
 ) -> None:
+    """
+    Plots some or all of the 2015, 2021, and 2022 difference (from 2001) spectra. Creates
+    subplots for each zoomed in wavelength region (for each element of `*_list` arguments).
+
+    Parameters
+    ----------
+    lam: np.ndarray
+        The wavelengths of the spectra.
+    diff_15: np.ndarray | None
+        The flux density of the 2015 - 2001 difference spectrum.
+    diff_21: np.ndarray | None
+        The flux density of the 2021 - 2001 difference spectrum.
+    diff_22: np.ndarray | None
+        The flux density of the 2022 - 2001 difference spectrum.
+    diff_15_err: np.ndarray | None
+        The error of the flux density of the 2015 - 2001 difference spectrum.
+    diff_21_err: np.ndarray | None
+        The error of the flux density of the 2021 - 2001 difference spectrum.
+    diff_22_err: np.ndarray | None
+        The error of the flux density of the 2022 - 2001 difference spectrum.
+    ions_list: list[dict[str, float] | bool]
+        For each subplot, this list constains a dictionary of the ions to plot, or a boolean
+        indicating whether to plot the default ions for the given plot centre.
+    vel_plot_width: float | None
+        The width of the velocity plots.
+    hlines_list: list[dict[str, float] | None]
+        The horizontal lines to plot for each subplot.
+    fill_between_bounds: tuple[float, float] | None
+        The bounds of the region to fill between.
+    fill_between_label: str | None
+        The label of the region to fill between.
+    fill_between_opacity: float
+        The opacity of the region to fill between.
+    plot_centres_list: list[list[float] | float]
+    
+    """
+    #TODO: fill in rest of docstring
+
     num_plots_options = [
         len(plot_centres_list), len(plot_labels_list),
         len(ions_list), len(n_ticks_x_list), len(scale_axes_list),
-        len(plot_y_bounds_list)
+        len(plot_y_bounds_list), len(hlines_list)
     ]
     if not np.all(np.array(num_plots_options) == num_plots_options[0]):
         raise ValueError(
@@ -573,7 +855,8 @@ def plot_diff_spectra_all(
             f"ions_list: {len(ions_list)}\n"
             f"n_ticks_x_list: {len(n_ticks_x_list)}\n"
             f"scale_axes_list: {len(scale_axes_list)}\n"
-            f"plot_y_bounds_list: {len(plot_y_bounds_list)}"
+            f"plot_y_bounds_list: {len(plot_y_bounds_list)}\n"
+            f"hlines_list: {len(hlines_list)}"
         )
     num_plots = num_plots_options[0]
 
@@ -581,7 +864,7 @@ def plot_diff_spectra_all(
 
     if scale_all_axes:
         if num_plots != 2:
-            raise ValueError("scale_all_axes is only supported for 2 plots")
+            raise NotImplementedError("scale_all_axes is only supported for 2 plots")
         if not np.all(np.array(scale_axes_list) == False):
             raise ValueError("scale_axes_list must be False if scale_all_axes is True")
         if not np.all(np.array(plot_y_bounds_list) == False):
@@ -657,7 +940,7 @@ def plot_diff_spectra_all(
             diff_22_err=diff_22_err,
             ions=ions_list[i],
             vel_plot_width=vel_plot_width,
-            hlines=hlines,
+            hlines=hlines_list[i],
             fill_between_bounds=fill_between_bounds,
             fill_between_label=fill_between_label,
             fill_between_opacity=fill_between_opacity,
@@ -682,7 +965,6 @@ def plot_diff_spectra_all(
         raise ValueError(f"conflicting titles: {titles}")
     if const.PLOT_TITLES:
         fig.suptitle(titles[0])
-    # print(f"y_axis_labels: {y_axis_labels}")
     fig.supxlabel(x_axis_labels[0])
     if y_axis_labels[0] is not None:
         fig.supylabel(y_axis_labels[0])
@@ -706,6 +988,44 @@ def plot_gaussians(
     red_chi_sq: float | None = None,
     save_fig_name: str | None = ""
 ) -> None:
+    """
+    Plots the Gaussian fit to the data, showing all n Gaussians and
+    the total summed fit.
+
+    Parameters
+    ----------
+    x: np.ndarray
+        x values (e.g. wavelength array).
+    y_data: np.ndarray
+        y values (e.g. flux).
+    sep_gaussian_vals: np.ndarray[np.ndarray]
+        The values of the individual Gaussians (shape `(num_gaussians, len(x))`).
+    summed_gaussian_vals: np.ndarray
+        The values of the total summed Gaussian fit.
+    y_data_errs: np.ndarray | None
+        The errors on the y values.
+    summed_gaussian_errs: np.ndarray | None
+        The errors on the total summed Gaussian fit.
+    colour_map: Colormap
+        The colour map to use for the n different Gaussians.
+    error_opacity: float
+        The opacity of the error regions.
+    y_axis_label: str
+        The label for the y axis.
+    x_axis_label: str
+        The label for the x axis.
+    title: str | None
+        The title of the plot.
+    mask_vel_width: float | None
+        The width of the plot in velocity units. This will trim the data if
+        not None.
+    mask_lam_centre: float | None
+        The centre wavelength of the plot if trimming the data.
+    red_chi_sq: float | None
+        The reduced chi squared of the fit.
+    save_fig_name: str | None
+        The name of the file to save the plot to.
+    """
     if mask_vel_width is not None:
         if mask_lam_centre is None:
             raise ValueError("mask_lam_centre must be provided if mask_vel_width is provided")
@@ -764,9 +1084,33 @@ def compare_balmer_decrements( #TODO: overplot diff spectra (remove make_new_fig
     save_fig_name: str | None = "",
     **diff_kwargs: Any
 ) -> float | None:
+    """
+    Compares the balmer decrements for different numbers of Gaussians and velocity bins.
+    NOTE: This function is not yet implemented.
+
+    Parameters
+    ----------
+    results: list[list[dict[str, np.ndarray]]]
+        The results of the balmer decrement calculations. See
+        :func:`integrate.get_bd_comparison_info` for more details.
+    num_gaussians_list: list[int]
+        The number of Gaussians used for each calculation (inclusive).
+    num_bins_list: list[int]
+        The number of bins used for each calculation (inclusive).
+    year: int
+        The year of the data.
+    colour_map: Colormap
+        The colour map to use for the plots.
+    ylim: tuple[int, int]
+        The y-axis bounds of the plots.
+    save_fig_name: str | None
+        The name of the figure to save.
+    **diff_kwargs: Any
+        Additional keyword arguments to pass to :func:`plot_diff_spectra`.
+    """
     pass
 
-# def compare_balmer_decrements(
+# def compare_balmer_decrements_old(
 #     results: list[list[dict[str, np.ndarray]]],
 #     num_gaussians_list: list[int],
 #     num_bins_list: list[int],

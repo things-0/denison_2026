@@ -44,9 +44,10 @@ def get_bh_mass(
     fwhm_alpha_err: float
 ) -> tuple[float, float]:
     """
-    Estimate BH mass from Halpha line. Using the equation from Greene & Ho 2005
+    Estimate BH mass from Hα line using the equation from Greene & Ho (2005).
     
-    Parameters:
+    Parameters
+    ----------
     lum_alpha: float
         The luminosity of the Hα line in erg/s.
     lum_alpha_err: float
@@ -78,19 +79,28 @@ def get_bh_mass(
     # uncertainty (using log(mass))
     sig_log_lum = lum_alpha_err / lum_alpha     # error of log(luminosity) = δL/L
     sig_log_fwhm = fwhm_alpha_err / fwhm_alpha  # error of log(fwhm) = δV/V
-    sig_log_coeff = 0.35 / 2 # +0.4 -0.3
+    sig_log_coeff_upper = 0.4e6 / coeff         # +ve error of log(coeff) = δa/a
+    sig_log_coeff_lower = 0.3e6 / coeff         # -ve error of log(coeff) = δa/a
     sig_exp_lum = 0.02
     sig_exp_fwhm = 0.06
 
-    var_log_mbh = (
-        sig_log_coeff**2 +
-        (np.log(lum_norm) * sig_exp_lum)**2 +   # derivative * uncertainty...?
+    var_mbh_wout_coeff = (
+        (np.log(lum_norm) * sig_exp_lum)**2 +
         (exp_lum * sig_log_lum)**2 +
         (np.log(fwhm_norm) * sig_exp_fwhm)**2 +
         (exp_fwhm*sig_log_fwhm)**2
     )
+    var_mbh_upper = (
+        sig_log_coeff_upper**2 +
+        var_mbh_wout_coeff
+    )
+    var_mbh_lower = (
+        sig_log_coeff_lower**2 +
+        var_mbh_wout_coeff
+    )
 
-    sig_log_mbh = np.sqrt(var_log_mbh)
-    mbh_err = mbh * sig_log_mbh
+    sig_mbh_upper = np.sqrt(var_mbh_upper)
+    sig_mbh_lower = np.sqrt(var_mbh_lower)
+    mbh_err = (mbh * sig_mbh_lower, mbh * sig_mbh_upper)
 
     return mbh, mbh_err

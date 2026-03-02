@@ -34,9 +34,12 @@ def assign_narrow_components(
     gas_names: list[str]
         The names of the gas lines to assign components to.
 
-    Returns:
-        component_list: List of component numbers (one per gas line)
-        max_component: Highest component number used
+    Returns
+    -------
+    component_list: list[int]
+        A list of component numbers (one per gas line)
+    max_component: int
+        The highest component number used
     """
     
     # Define groupings
@@ -257,9 +260,9 @@ def fit_agn(
         bounds.append([(-500, 500), (50, 400)])
     
     # Broad Balmer components (wider velocity and dispersion ranges)
-    bounds.append([(-2000, 2000), (500, 5000)])     # Broad 1
-    bounds.append([(-2000, 2000), (1000, 3500)])   # Broad 2  
-    bounds.append([(-2000, 2000), (1000, 35000)])   # Broad 3
+    bounds.append([(-2000, 2000), (500, 2000)])     # Broad 1 # sigma was (500, 5000)
+    bounds.append([(-2000, 2000), (1000, 3500)])   # Broad 2  # sigma was (1000, 10000)
+    bounds.append([(-2000, 2000), (1000, 3500)])   # Broad 3  # sigma was (1000, 10000)
  
 
         
@@ -347,16 +350,20 @@ def fit_agn(
             hdu = fits.ImageHDU(comp, name=f'GAS_COMP_{k}')
             hdus.append(hdu)
 
-    # check if file already exists using os:
+    # check if outfile_dir exists, if not create it
+    if not outfile_dir.exists():
+        warn_msg = f"outfile_dir {outfile_dir} does not exist. Creating it."
+        warnings.warn(warn_msg)
+        outfile_dir.mkdir(parents=True, exist_ok=True)
+
     outfile_suffix = f"_{outfile_suffix}" if outfile_suffix != "" else ""
     outfile_name = f"ppxf_components{outfile_suffix}.fits"
     outfile_path = outfile_dir / outfile_name
-    # outfile_path = os.path.join(outfile_dir, outfile_name)
+    # check if the outfile already exists, if so create a copy with a different name
     while outfile_path.is_file():
         warnings.warn(f"file {outfile_name} already exists. Attempting to create copy.")
         outfile_name = outfile_name[:-5] + "_cpy.fits"
         outfile_path = outfile_dir / outfile_name
-        # outfile_path = os.path.join(outfile_dir, outfile_name)
     fits.HDUList(hdus).writeto(outfile_path, overwrite=False)
     print(f"\n\nFits file written to {outfile_path}")
 
@@ -364,7 +371,7 @@ def get_nl_and_stell_cont(
     infile: str = "ppxf_components",
     infile_suffix: str = "",
     infile_path: Path = const.PPXF_DATA_DIR,
-    nl_gas_comp_ids: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    nl_gas_comp_ids: list[int] = [1, 2, 3, 4], #TODO: generalise to arbitrary number of narrow line components
     data_is_normalised: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
     if infile_suffix != "":
@@ -386,24 +393,26 @@ def get_nl_and_stell_cont(
             nl *= medflux
             stell_cont *= medflux
 
-    return nl, stell_cont, (lam)
+    return nl, stell_cont
 
 def get_ha_hb_comps(
     infile: str = "ppxf_components",
     infile_suffix: str = "",
     infile_path: Path = const.PPXF_DATA_DIR,
-    br_gas_comp_ids: list[int] = [10, 11, 12],
+    br_gas_comp_ids: list[int] = [5, 6, 7], #TODO: generalise to arbitrary number of narrow line components
     data_is_normalised: bool = True,
     vel_width: float = const.VEL_WIDTH_GAUSSIAN_FIT
 ) -> tuple[np.ndarray, np.ndarray]:
     if infile_suffix != "":
         infile_suffix = "_" + infile_suffix
     actual_infile = infile_path / (infile + infile_suffix + ".fits")
+
     with fits.open(actual_infile) as hdul:
         lam = hdul['WAVELENGTH'].data
 
         all_broad = np.zeros((len(br_gas_comp_ids), len(lam)))
         summed_broad = np.zeros_like(lam)
+
 
         for i, comp_id in enumerate(br_gas_comp_ids):
             comp_flux = hdul[f'GAS_COMP_{comp_id}'].data
@@ -436,6 +445,8 @@ def plot_fit_comp(
     in_file_suffix: str = "",
     in_file_dir: Path = const.PPXF_DATA_DIR,
     fit_is_normalised: bool = True,
+    plot_individual_gas_components: bool = False,
+    plot_all_gas_components: bool = True,
 ):
 
     if in_file_suffix != "":
@@ -473,26 +484,26 @@ def plot_fit_comp(
     
     gas_components = dict(sorted(gas_components.items()))
 
-    # plot indiviual gas components:
-    for k, spec in gas_components.items():
-        plt.figure(figsize=const.FIG_SIZE, layout="constrained")
-        plt.plot(lam, spec, 'k')
-        plt.title(f'Gas component {k}')
-        plt.xlabel(r'Wavelength [$\AA$]')
-        plt.ylabel('Flux')
-        # plt.tight_layout()
-        plt.show()
+    if plot_individual_gas_components:
+        for k, spec in gas_components.items():
+            plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+            plt.plot(lam, spec, 'k')
+            plt.title(f'Gas component {k}')
+            plt.xlabel(r'Wavelength [$\AA$]')
+            plt.ylabel('Flux')
+            # plt.tight_layout()
+            plt.show()
 
-    # plot indiviual gas components:
-    plt.figure(figsize=const.FIG_SIZE, layout="constrained")
-    for i, (k, spec) in enumerate(gas_components.items()):
-        plt.plot(lam, spec, 'k', color=const.ALT_COLOUR_MAP(i), label=f'Gas component {k}')
-        plt.xlabel(r'Wavelength [$\AA$]')
-        plt.ylabel('Flux')
-        # plt.tight_layout()
-    plt.title(f"All Gas components ({in_file_suffix})")
-    plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
-    plt.show()
+    if plot_all_gas_components:
+        plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+        for i, (k, spec) in enumerate(gas_components.items()):
+            plt.plot(lam, spec, 'k', color=const.ALT_COLOUR_MAP(i), label=f'Gas component {k}')
+            plt.xlabel(r'Wavelength [$\AA$]')
+            plt.ylabel('Flux')
+            # plt.tight_layout()
+        plt.title(f"All Gas components ({in_file_suffix})")
+        plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
+        plt.show()
         
     # get the narrow IDs:
     narrow_ids = [k for k in gas_components if k <= max_narrow_component]

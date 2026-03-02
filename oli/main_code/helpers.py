@@ -8,36 +8,6 @@ from typing import Any
 
 from . import constants as const
 
-# def get_res_data(
-#     fwhm_spec_res: np.ndarray | None = None, # wresl
-#     wdisp: np.ndarray | None = None,
-#     resolving_power: np.ndarray | float | None = None, # RES_15_BLUE or RES_15_RED
-#     sigma: np.ndarray | float | None = None,
-# ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-#     arr_len = 1
-#     none_count = 0
-#     for data in [fwhm_spec_res, wdisp, resolving_power, sigma]:
-#         if data is None:
-#             none_count += 1
-#         elif isinstance(data, np.ndarray):
-#             if arr_len != 1 and len(data) != arr_len:
-#                 raise ValueError("all arrays must have the same length")
-#     if none_count in [0, 4]:
-#         raise ValueError("Must have 1-3 None arguments")
-#     if isinstance(resolving_power, float):
-#         resolving_power = np.full(arr_len, resolving_power)
-#     if isinstance(sigma, float):
-#         sigma = np.full(arr_len, sigma)
-
-#     if fwhm_spec_res is not None:
-#         return fwhm_spec_res, fwhm_spec_res, resolving_power
-#     elif wdisp is not None:
-#         return wdisp, wdisp, resolving_power
-#     elif resolving_power is not None:
-#         return resolving_power, resolving_power, resolving_power
-#     else:
-#         raise ValueError("No resolution data provided")
-
 def combine_sami_vals(
     blue_vals: list[np.ndarray],
     red_vals: list[np.ndarray],
@@ -378,6 +348,26 @@ def bin_data_by_median(
     x: np.ndarray, y: np.ndarray, bin_width: float,
     y_errs: np.ndarray | None = None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    """
+    Bins data by the median of the x values in each bin.
+
+    Parameters
+    ----------
+    x: np.ndarray
+        x values (e.g. wavelength array).
+    y: np.ndarray
+        y values (e.g. flux).
+    bin_width: float
+        Width of the bins.
+    y_errs: np.ndarray | None
+        y uncertainties (e.g. flux uncertainties).
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray | None]
+        The binned x values, y values and y uncertainties.
+    """
+
     step_size = np.median(np.diff(x))
 
     points_per_bin = int(bin_width / step_size)
@@ -455,12 +445,6 @@ def convert_to_vel_data(
         if flux_err is not None:
             trimmed_flux_err = flux_err[vel_width_mask]
             trimmed_flux_errs.append(trimmed_flux_err)
-    
-
-    # check if all trimmed_vels are the same
-    # if not all(np.all(trimmed_vel == trimmed_vels[0]) for trimmed_vel in trimmed_vels):
-    #     print(trimmed_vels)
-    #     raise ValueError("All trimmed_vels are not the same")
     
     return trimmed_vels, trimmed_fluxes, trimmed_flux_errs
 
@@ -787,7 +771,7 @@ def get_default_bounds(
         In each list, the first `num_of_gaussians` elements are the height bounds,
         the next `num_of_gaussians` elements are the mu bounds, and the last
         `num_of_gaussians` elements are the sigma bounds. i.e.
-        `[h_min * n, μ_min * n, σ_min * n], [h_max * n, μ_max * n, σ_max * n]`
+        `([h_min] * n + [μ_min] * n + [σ_min] * n), ([h_max] * n + [μ_max] * n + [σ_max] * n)`
     """
     height_min = const.HEIGHT_MIN
     height_max = 2 * np.max(y)
@@ -1028,15 +1012,6 @@ def get_fwhm(
         return fwhm_ang
     if lam_centre is None:
         lam_centre = (lam_right + lam_left) / 2
-    #TD: remove testing
-    # lam_centre_option_1 = (x[np.argmax(y_gaussian)])
-    # lam_centre_option_2 = ((lam_right + lam_left) / 2)
-    # lam_centre_option_3 = (x[(above_half[0] + above_half[-1]) // 2])
-    # print(f"Hα: {const.H_ALPHA}, Hβ: {const.H_BETA}")
-    # print(f"x[argmax(y)]: {lam_centre_option_1}")
-    # print(f"average lam of lam_left and lam_right: {lam_centre_option_2}")
-    # print(f"average index of lam_left and lam_right: {lam_centre_option_3}")
-    #
     vel_left = convert_lam_to_vel(lam_left, lam_centre)
     vel_right = convert_lam_to_vel(lam_right, lam_centre)
     fwhm_vel = vel_right - vel_left
@@ -1053,8 +1028,8 @@ def compare_yasmeen_results(
     luminosity_alpha_21: tuple[float, float] | None = None,
     bd_15: tuple[float, float] | None = None,
     bd_21: tuple[float, float] | None = None,
-    bh_mass_15: tuple[float, float] | None = None,
-    bh_mass_21: tuple[float, float] | None = None
+    bh_mass_15: tuple[float, float] | None = None, #TODO: handle the case where bh_mass_xx[1] is a tuple (i.e. different lower and upper errors)
+    bh_mass_21: tuple[float, float] | None = None, #TODO: handle the case where bh_mass_xx[1] is a tuple (i.e. different lower and upper errors)
 ) -> None:
     """
     Compare the results of the YASMEEN code with the results of the SSP code,
@@ -1064,29 +1039,31 @@ def compare_yasmeen_results(
     Parameters
     ----------
     fwhm_alpha_15: tuple[float, float] | None = None
-        The FWHM of the Hα line in 2015.
+        The FWHM and error of the Hα line in 2015 (km/s).
     fwhm_alpha_21: tuple[float, float] | None = None
-        The FWHM of the Hα line in 2021.
+        The FWHM and error of the Hα line in 2021 (km/s).
     fwhm_beta_15: tuple[float, float] | None = None
-        The FWHM of the Hβ line in 2015.
+        The FWHM and error of the Hβ line in 2015 (km/s).
     fwhm_beta_21: tuple[float, float] | None = None
-        The FWHM of the Hβ line in 2021.
+        The FWHM and error of the Hβ line in 2021 (km/s).
     flux_alpha_15: tuple[float, float] | None = None
-        The flux of the Hα line in 2015.
+        The flux and error of the Hα line in 2015 (10^-17 ergs/s/cm^2).
     flux_alpha_21: tuple[float, float] | None = None
-        The flux of the Hα line in 2021.
+        The flux and error of the Hα line in 2021 (10^-17 ergs/s/cm^2).
     luminosity_alpha_15: tuple[float, float] | None = None
-        The luminosity of the Hα line in 2015.
+        The luminosity and error of the Hα line in 2015 (10^40 ergs/s).
     luminosity_alpha_21: tuple[float, float] | None = None
-        The luminosity of the Hα line in 2021.
+        The luminosity and error of the Hα line in 2021 (10^40 ergs/s).
     bd_15: tuple[float, float] | None = None
-        The Balmer decrement of the Hα line in 2015.
+        The Balmer decrement and error of the Hα line in 2015.
     bd_21: tuple[float, float] | None = None
-        The Balmer decrement of the Hα line in 2021.
+        The Balmer decrement and error of the Hα line in 2021.
     bh_mass_15: tuple[float, float] | None = None
-        The BH mass of the Hα line in 2015.
+        The BH mass and error of the Hα line in 2015 (10^6 M_sun). Note, error
+        can be a single ± value or a tuple of (lower error, upper error).
     bh_mass_21: tuple[float, float] | None = None
-        The BH mass of the Hα line in 2021.
+        The BH mass and error of the Hα line in 2021 (10^6 M_sun). Note, error
+        can be a single ± value or a tuple of (lower error, upper error).
     """
 
     all_results = {

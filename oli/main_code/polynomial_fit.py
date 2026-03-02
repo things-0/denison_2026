@@ -66,7 +66,6 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
     plot_adjusted: bool = True,
     adjusted_plot_lam_bounds: tuple[float] | None = None, # const.TOTAL_LAM_BOUNDS, # (3800, 8000),
     adjusted_flux_y_bounds: tuple[float] | None = None,
-    # adjusted_err_y_bounds: tuple[float] | None = None, #TD: remove?
     ions: dict[str, float] | None = None,
     blur_step: int = 1,
     resample_step: int = 2,
