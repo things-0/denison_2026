@@ -115,6 +115,7 @@ def plot_vert_emission_lines(
                 color=vlines_cmap(i), label=name
             )
 
+#TODO: add more comments from here down (including polynomial_fit & ppxf_funcs)
 
 def plot_min_res(
     lam_sdss: np.ndarray,
@@ -159,15 +160,15 @@ def plot_min_res(
     lam15_red_max = np.max(lam15_red)
 
     if plot_RES_15_RED:
-        res_plot_bounds = [np.min(res_min), np.max(
+        res_plot_bounds = [np.min(res_min), np.max((
             np.max(res21), np.max(res22), 
             np.max(res01), const.RES_15_BLUE, const.RES_15_RED
-        )]
+        ))]
     else:
-        res_plot_bounds = [np.min(res_min), np.max(
+        res_plot_bounds = [np.min(res_min), np.max((
             np.max(res21), np.max(res22), 
             np.max(res01), const.RES_15_BLUE
-        )]
+        ))]
     lam_plot_range = np.max(lam_sdss) - lam15_blue_min
     axhline_end = (lam15_blue_max - lam15_blue_min) / lam_plot_range
 
@@ -669,7 +670,6 @@ def plot_diff_spectra_one_fig(
         else:
             raise NotImplementedError("scale_axes is only supported for 2 centres")
     else:
-        # plt.xlabel(x_axis_label)
         axes = [fig.add_subplot()]
     for i in range(num_centres):
         ax = axes[i] if scale_axes else axes[0]
@@ -1190,7 +1190,7 @@ def plot_ppxf_comp(
             plt.xlabel(r'Wavelength [$\AA$]')
             plt.ylabel('Flux')
             # plt.tight_layout()
-        plt.title(f"All Gas components ({infile_suffix})")
+        plt.title(f"All Gas components ({infile_suffix.strip('_')})")
         plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
         plt.show()
         
@@ -1210,7 +1210,7 @@ def plot_ppxf_comp(
     ax1.plot(lam, galaxy, 'k', label="galaxy")
     ax1.plot(lam, bestfit, 'm', label="bestfit")
     ax1.plot(lam, stellar, 'r', label="stellar")
-    ax1.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f'full spectrum {infile_suffix}')
+    ax1.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f"full spectrum ({infile_suffix.strip('_')})")
     ymax = galaxy[lam > 3700].max()
     ymin = galaxy[lam > 3700].min()
     yrange = ymax-ymin

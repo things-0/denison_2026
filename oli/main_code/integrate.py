@@ -211,11 +211,6 @@ def calculate_balmer_decrement(
         vel_centre = vel_left + bin_width / 2
         vel_right = vel_left + bin_width
 
-        #TODO: remove testing
-        if num_bins == 1:
-            print(f"vel_centre: {vel_centre:.3f}") # should be 0
-        #
-
         cur_lam_bounds_alpha = (convert_vel_to_lam(vel_left, const.H_ALPHA), convert_vel_to_lam(vel_right, const.H_ALPHA))
         cur_lam_bounds_beta = (convert_vel_to_lam(vel_left, const.H_BETA), convert_vel_to_lam(vel_right, const.H_BETA))
 
@@ -324,8 +319,8 @@ def get_bd_comparison_info(
                 one_gauss_results.append({
                     'bd': bd[0],
                     'bd_err': bd_err[0],
-                    'vel_centres': 0,
-                    'num_bins': 1,
+                    'vel_centres': 0, # same as vel_centres[0]
+                    'num_bins': 1, # same as num_bins
                     'num_gaussians': num_gaussians
                 })
             else:

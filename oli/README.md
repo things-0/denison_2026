@@ -10,7 +10,7 @@ Check that you have the spectroscopy .fits files and ensure the correct director
 The difference spectrum method in [`main.ipynb`](main.ipynb) follows these steps approximately:
 
 - Read in the data, filter out bad values, blur all spectra to the lowest resolution, and resample all data onto a common wavelength array using [`get_adjusted_data`](main_code/data_reading.py#get_adjusted_data)
-- Find the ratio of flux between all epochs and the 2015 spectrum, find a best fitting polynomial to the ratio and multiply its inverse back on to the origigal spectra using [`apply_poly_fit`](main_code/polynomial_fit.py#apply_poly_fit)
+- Find the ratio of flux between all epochs and the 2015 spectrum, find a best fitting polynomial to the ratio and multiply its inverse back on to the original spectra using [`apply_poly_fit`](main_code/polynomial_fit.py#apply_poly_fit)
 - Subtract the 2001 flux from the flux of all other epochs using [`get_diff_spectra`](main_code/difference.py#get_diff_spectra)
 - Fit a sum of $n$ Gaussians to the difference spectra using [`fit_gaussians`](main_code/gaussian_fitting.py#fit_gaussians)
 - Integrate the flux under the best fit Gaussian curves using [`integrate_flux`](main_code/integrate.py#integrate_flux)

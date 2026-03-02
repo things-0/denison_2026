@@ -189,7 +189,6 @@ def get_sdss_data(
     with fits.open(folder_path / file_name) as hdulist:
         image_data = hdulist['COADD'].data
 
-
         flux = image_data['flux']
         inv_var = image_data['ivar']
         log_lam_obs = image_data['loglam']
@@ -198,13 +197,17 @@ def get_sdss_data(
             wresl = image_data['wresl']         # FWHM resolution accounting for instrumental + other dispersion (Angstroms)
             mjd = hdulist['SPALL'].data['MJD'][0]
         except KeyError: # wresl unavailable for 2001 spectrum
-            warn_msg = f"Wavelength resolution data not available in {file_name}"
+            warn_msg = (
+                f"Wavelength resolution data not available in {file_name}. "
+                f"fwhm_per_pix will be calculated from wdisp and lam instead."
+            )
             warnings.warn(warn_msg)
             wresl = None
             mjd = hdulist['SPZLINE'].data['MJD'][0]
 
     flux *= 10 ** (flux_power_of_10 - 17)
-    flux_err = np.sqrt(1 / inv_var)
+    non_zero_inv_var = np.where(inv_var == 0, np.nan, inv_var)
+    flux_err = np.sqrt(1 / non_zero_inv_var)
 
     lam_obs = 10**log_lam_obs
     lam_rest = lam_obs / (1 + z)

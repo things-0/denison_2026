@@ -88,7 +88,7 @@ def fit_agn(
     year_to_adjust: int | None = None,
     is_sdss: bool | None = None,
     sami_res: float | None = None,
-    in_file_name: str | None = None,
+    infile_name: str | None = None,
     outfile_suffix: str = "",
     outfile_dir: Path = const.PPXF_DATA_DIR,
     z: float = const.Z_SPEC,
@@ -107,15 +107,15 @@ def fit_agn(
     baseline_year: int | None
         The year to use as the baseline (calibration) flux. Must be one of 2001, 2015,
         2021, or 2022. Should be None if `data` is provided or data is read in raw
-        using `in_file_name` (no polynomial fit).
+        using `infile_name` (no polynomial fit).
     year_to_adjust: int | None
         The year to adjust. Must be one of 2001, 2015, 2021, or 2022. Should be None if `data`
-        is provided or data is read in raw using `in_file_name` (no polynomial fit).
+        is provided or data is read in raw using `infile_name` (no polynomial fit).
     is_sdss: bool | None
-        Specifies whether the data read in from `in_file_name` is SDSS or SAMI data.
+        Specifies whether the data read in from `infile_name` is SDSS or SAMI data.
     sami_res: float | None
         The resolving power of the SAMI data.
-    in_file_name: str | None
+    infile_name: str | None
         The name of the file to read the data from. Should be None if `data` is provided
         or a polynomial fit is to be applied to the data (by specifying `year_to_adjust`
         and `baseline_year`).
@@ -133,8 +133,8 @@ def fit_agn(
     """
     if data is None:
         if baseline_year is not None:
-            if in_file_name is not None:
-                raise ValueError("baseline_year provided but in_file_name is not None.")
+            if infile_name is not None:
+                raise ValueError("baseline_year provided but infile_name is not None.")
             if year_to_adjust is None:
                 raise ValueError("year_to_adjust is required if using baseline_year to get data")
             all_epochs_data = get_adjusted_data(
@@ -155,20 +155,20 @@ def fit_agn(
             # raw data without applying polynomial fit
             if year_to_adjust is not None:
                 raise ValueError("baseline_year is required if year_to_adjust is provided.")
-            if in_file_name is None:
-                raise ValueError("in_file_name is required if data is not provided and baseline_year is None.")
+            if infile_name is None:
+                raise ValueError("infile_name is required if data is not provided and baseline_year is None.")
             if is_sdss is None:
                 raise ValueError("is_sdss is required if data is not provided and baseline_year is None.")
             if is_sdss:
                 data = get_sdss_data( 
-                    file_name=in_file_name, folder_path=const.SDSS_DATA_DIR,
+                    file_name=infile_name, folder_path=const.SDSS_DATA_DIR,
                     z=z, rm_or_replace_other_bad_values=True,
                 )
             else:
                 if sami_res is None:
                     raise ValueError("sami_res is required if data is not provided, baseline_year is None, and is_sdss is False")
                 data = get_sami_data(
-                    file_name=in_file_name, folder_path=const.SAMI_DATA_DIR,
+                    file_name=infile_name, folder_path=const.SAMI_DATA_DIR,
                     z=z, perform_log_rebin=True, resolving_power=sami_res,
                     rm_or_replace_other_bad_values=True,
                 )
