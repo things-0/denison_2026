@@ -20,14 +20,14 @@ The difference spectrum method in [`main.ipynb`](main.ipynb) follows these steps
 The pPXF method reads in the data as above, and fits the broad and narrow line components using the modified [`fit_agn`](main_code/ppxf_funcs.py#fit_agn) function (from Scott Croom). The fit results are saved to [`PPXF_DATA_DIR`](main_code/constants.py#PPXF_DATA_DIR). The components are then extracted from the results and analyzed using the same functions above. 
 
 ### Plotting and saving figures
-Depending on the data to plot, different functions are required within [`plotting.py`](main_code/plotting.py). Most plotting parameters (figure size, axis labels, etc.) can be adjusted within the function call, or within the default values used in [`constants.py`](main_code/constants.py). To save the figures to an `output/` directory, set [`SAVE_FIGS`](main_code/constants.py#SAVE_FIGS) to `True`. By default, figure titles will be omitted (shown) if the figures are saved (not saved).
+Depending on the data to plot, different functions are required within [`plotting.py`](main_code/plotting.py). Most plotting parameters (figure size, axis labels, etc.) can be adjusted within the function call, or from the default values used in [`constants.py`](main_code/constants.py). To save the figures to an `output/` directory, set [`SAVE_FIGS`](main_code/constants.py#SAVE_FIGS) to `True`. By default, figure titles will be omitted (shown) if the figures are saved (not saved).
 
 
 ### Other code
 - [`helpers.py`](main_code/helpers.py) contains various functions that assist functions defined in other main python files.
 - [`d400_lick_indices.py`](main_code/d4000_lick_indices.py) calculates the D4000 (and other) lick indices for a spectrum.
 - [`adjust_calibration.py`](main_code/adjust_calibration.py) contains functions that help recalibrate and adjust the data as it is being read in via [`get_adjusted_data`](main_code/data_reading.py#get_adjusted_data)
-- [`qsofit.py`](main_code/qsofit.py) is an old file used to help with the QSOFit analysis (obsolete)
+- [`qsofit.py`](main_code/qsofit.py) is an old file used to help with the QSOFit analysis (deprecated). All other code in [`pyqsofit_code/`](pyqsofit_code/), [`qsofitmore_code/`](qsofitmore_code/), and [`old_stuff/`](old_stuff/) is also deprecated.
 
 ### Notes
 - Any remaining tasks I haven't got round to completing are marked with `#TODO:`

@@ -68,21 +68,23 @@ def integrate_flux(
         gauss_sfd_vals, gauss_sfd_errs = gauss_results["summed_y_vals"], gauss_results["summed_y_errs"]
         fwhm_mean, fwhm_err = gauss_results["fwhm_mean"], gauss_results["fwhm_err"]
 
+        # mask used for fitting Gaussians
         gaussian_trimmed_mask = get_lam_mask(lam, vel_gaussian_fit_width, lam_centre)
         gaussian_trimmed_lam = lam[gaussian_trimmed_mask]
-        new_integrate_width_mask = np.where(
-            (gaussian_trimmed_lam > lam_bounds[0]) &
-            (gaussian_trimmed_lam < lam_bounds[1]) &
-            (np.isfinite(gaussian_trimmed_lam))
+        # mask used for integrating under the Gaussian values (smaller velocity width than the fit width)
+        integrate_width_mask = np.where(
+            (gaussian_trimmed_lam > lam_bounds[0]) & # apply the mask to the gauss trimmed lams because the mask
+            (gaussian_trimmed_lam < lam_bounds[1]) & # will be applied to the gauss_sfd_vals, so their lengths
+            (np.isfinite(gaussian_trimmed_lam))      # need to match
         )
         if gaussian_trimmed_lam.shape != gauss_sfd_vals.shape:
             raise ValueError("gaussian_trimmed_lam and gauss_sfd_vals should have the same shape")
         if gaussian_trimmed_lam.shape != gauss_sfd_errs.shape:
             raise ValueError("gaussian_trimmed_lam and gauss_sfd_errs should have the same shape")
-        lam_trimmed = gaussian_trimmed_lam[new_integrate_width_mask]
+        lam_trimmed = gaussian_trimmed_lam[integrate_width_mask]
         # integrate under gaussian values
-        sfd_trimmed = gauss_sfd_vals[new_integrate_width_mask]
-        sfd_err_trimmed = gauss_sfd_errs[new_integrate_width_mask]
+        sfd_trimmed = gauss_sfd_vals[integrate_width_mask]
+        sfd_err_trimmed = gauss_sfd_errs[integrate_width_mask]
     else:
         integrate_width_mask = np.where(
             (lam > lam_bounds[0]) & (lam < lam_bounds[1]) & (np.isfinite(spec_flux_density))
@@ -155,10 +157,12 @@ def calculate_balmer_decrement(
     -------
     tuple[np.ndarray, np.ndarray, np.ndarray]
         The balmer decrements, balmer decrement errors and velocity bin centres
-        for each bin.
+        for each bin. If `num_bins` is 1, the values are still stored as arrays
+        with length 1.
     """
     bin_width = vel_integration_width / num_bins
 
+    # Hα and Hβ masks with `vel_gaussian_fit_width` velocity width
     gfw_alpha_mask = get_lam_mask(lam, vel_gaussian_fit_width, const.H_ALPHA)
     gfw_beta_mask = get_lam_mask(lam, vel_gaussian_fit_width, const.H_BETA)
 
@@ -186,13 +190,14 @@ def calculate_balmer_decrement(
         if np.any(y_alpha_err < 0) or np.any(y_beta_err < 0):
             raise ValueError("y_alpha_err and y_beta_err should not be negative")
     else:
+        # trim the data as if a mask was applied when fitting Gaussians to ensure the lengths match
         y_alpha = sfd_diff[gfw_alpha_mask]
         y_alpha_err = sfd_diff_err[gfw_alpha_mask]
         y_beta = sfd_diff[gfw_beta_mask]
         y_beta_err = sfd_diff_err[gfw_beta_mask]
 
     # assumes vel_integration_width is < vel_gaussian_fit_width
-        # make separate masks for each num_gaussians case if not the case
+        # need to make separate masks for each num_gaussians case if assumption is incorrect
     x_alpha = lam[gfw_alpha_mask] 
     x_beta = lam[gfw_beta_mask]
 
@@ -201,9 +206,15 @@ def calculate_balmer_decrement(
     vel_bin_centres = []
 
     for i in range(num_bins):
+        # get edges and centre of current bin
         vel_left = -vel_integration_width / 2 + i * bin_width
         vel_centre = vel_left + bin_width / 2
         vel_right = vel_left + bin_width
+
+        #TODO: remove testing
+        if num_bins == 1:
+            print(f"vel_centre: {vel_centre:.3f}") # should be 0
+        #
 
         cur_lam_bounds_alpha = (convert_vel_to_lam(vel_left, const.H_ALPHA), convert_vel_to_lam(vel_right, const.H_ALPHA))
         cur_lam_bounds_beta = (convert_vel_to_lam(vel_left, const.H_BETA), convert_vel_to_lam(vel_right, const.H_BETA))
@@ -287,9 +298,8 @@ def get_bd_comparison_info(
         num_bins_bounds[0], num_bins_bounds[1] + 1
     ))
 
-    # Results: [num_gaussians_idx][num_bins_idx] -> (bd_arr, err_arr, vel_arr)
+    # Results: [num_gaussians_idx][num_bins_idx] -> {"bd", "bd_err", "vel_centres", "num_bins", "num_gaussians"}
     all_results = []
-    # one_bin_results = []
 
     for num_gaussians in num_gaussians_list:
         one_gauss_results = []
@@ -299,7 +309,7 @@ def get_bd_comparison_info(
         for num_bins in num_bins_list:
             if print_progress:
                 print(f"{num_bins}/{num_bins_bounds[1]} bins (of {num_gaussians} gaussians)")
-            bd, bd_err, vel_centres = calculate_balmer_decrement( #TODO: check why you're getting negative errors
+            bd, bd_err, vel_centres = calculate_balmer_decrement(
                 lam, sfd_diff, sfd_diff_err,
                 num_bins=num_bins,
                 num_gaussians=num_gaussians,

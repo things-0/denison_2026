@@ -93,7 +93,7 @@ VEL_BLUR_BIN_WIDTH = 1500 # km/s
 # Gaussian fitting parameters
 MAXFEV = 2100 # default is 1600
 MIN_MU = 1/5 # of total range of x plus minimum x value
-PEAK_MIN_RANGE = 1/35 # of total range of x - decrease for sharper peaks
+PEAK_MIN_RANGE = 1/35 # of total range of x. decrease for sharper peaks
 HEIGHT_MIN = 0
 HEIGHT_MAX = 10
 DEFAULT_NUM_GAUSSIANS = 2
@@ -114,6 +114,10 @@ ERR_OPAC = 0.1
 FILL_BETWEEN_OPAC = 0.5
 COLOUR_MAP = plt.cm.tab10
 ALT_COLOUR_MAP = plt.cm.tab20
+COL_01 = "green"
+COL_15 = "purple"
+COL_21 = "black"
+COL_22 = "orange"
 FIG_LAYOUT = "constrained"
 
 VEL_WIDTH_GAUSSIAN_FIT = VEL_PLOT_WIDTH

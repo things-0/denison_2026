@@ -313,7 +313,7 @@ def fit_gaussians(
         chi_sq = np.sum((residuals / y_errs)**2)
         dof = len(x) - 3 * num_gaussians 
             # number of data points minus number of parameters
-            # 3 because each Gaussian has 3 parameters (height, mu, sigma)
+            # 3n because each Gaussian has 3 parameters (height, mu, sigma)
         red_chi_sq = chi_sq / dof
         
         if use_best_fit_params_for_mc:

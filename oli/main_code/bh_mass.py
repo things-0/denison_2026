@@ -6,7 +6,7 @@ import astropy.units as u
 from . import constants as const
 
 
-def get_luminosity(flux: float, flux_err: float, z: float = const.Z_LUM) -> float:
+def get_luminosity(flux: float, flux_err: float, z: float = const.Z_LUM) -> tuple[float, float]:
     """
     Get the luminosity of a given line flux.
 
@@ -42,7 +42,7 @@ def get_bh_mass(
     lum_alpha_err: float,
     fwhm_alpha: float,
     fwhm_alpha_err: float
-) -> tuple[float, float]:
+) -> tuple[float, tuple[float, float]]:
     """
     Estimate BH mass from Hα line using the equation from Greene & Ho (2005).
     
@@ -61,8 +61,8 @@ def get_bh_mass(
     -------
     mbh: float
         The BH mass in solar masses.
-    mbh_err: float
-        The error on the BH mass in solar masses.
+    mbh_err: tuple[float, float]
+        The lower and upper error on the BH mass in solar masses.
     """
     coeff = 2.0e6   # a
     exp_lum = 0.55  # b
