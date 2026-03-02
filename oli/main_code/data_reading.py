@@ -81,7 +81,7 @@ def get_sami_data(
 
         if np.any(~np.isfinite(lam_rest)):
             # In theory this should never happen
-            raise ValueError("Lam has nans")
+            raise ValueError("lam has nans")
 
         flux = hdulist["PRIMARY"].data
         var = hdulist["VARIANCE"].data
@@ -189,7 +189,6 @@ def get_sdss_data(
     with fits.open(folder_path / file_name) as hdulist:
         image_data = hdulist['COADD'].data
 
-
         flux = image_data['flux']
         inv_var = image_data['ivar']
         log_lam_obs = image_data['loglam']
@@ -198,13 +197,17 @@ def get_sdss_data(
             wresl = image_data['wresl']         # FWHM resolution accounting for instrumental + other dispersion (Angstroms)
             mjd = hdulist['SPALL'].data['MJD'][0]
         except KeyError: # wresl unavailable for 2001 spectrum
-            warn_msg = f"Wavelength resolution data not available in {file_name}"
+            warn_msg = (
+                f"Wavelength resolution data not available in {file_name}. "
+                f"fwhm_per_pix will be calculated from wdisp and lam instead."
+            )
             warnings.warn(warn_msg)
             wresl = None
             mjd = hdulist['SPZLINE'].data['MJD'][0]
 
     flux *= 10 ** (flux_power_of_10 - 17)
-    flux_err = np.sqrt(1 / inv_var)
+    non_zero_inv_var = np.where(inv_var == 0, np.nan, inv_var)
+    flux_err = np.sqrt(1 / non_zero_inv_var)
 
     lam_obs = 10**log_lam_obs
     lam_rest = lam_obs / (1 + z)
@@ -255,6 +258,8 @@ def get_sdss_data(
         "velscale": velscale
     }
 
+#TODO: use "Spectrum" class instead of dictionaries? (attributes like lam, flux_as_is, flux_blurred,
+# flux_resampled, flux_polyfit, flux_err, fwhm, velscale, etc.)
 def get_adjusted_data(
     blur_step: int = 1,
     resample_step: int = 2,
@@ -279,7 +284,7 @@ def get_adjusted_data(
     fname_2021: str = const.FNAME_2021,
     fname_2022: str = const.FNAME_2022,
     z: float = const.Z_SPEC
-) -> dict[str, dict[str, np.ndarray]]:
+) -> dict[str, dict[str, np.ndarray]]: 
     """
     Get the wavelength, flux, and flux error arrays for the spectra.
 
@@ -589,7 +594,7 @@ def get_adjusted_data(
             [flux15_red_blurred_resampled, err15_red_resampled],
         )
 
-
+        # blue and red data have been combined, so separate dictionaries are no longer needed
         all_data.pop("2015_blue")
         all_data.pop("2015_red")
 
@@ -609,9 +614,9 @@ def get_adjusted_data(
 
         set_all_values(
             all_data, [
-                ("lam", lam01),
-                ("fwhm_per_pix", fwhm_per_pix_all),
-                ("velscale", velscale_all)
+                ("lam", lam01),                     # lam is the same for all epochs after resampling
+                ("fwhm_per_pix", fwhm_per_pix_all), # fwhm_per_pix only depends on lam and resolving power (which is the same for all epochs after blurring)
+                ("velscale", velscale_all)          # velscale only depends on lam
             ]
         )
 

@@ -5,7 +5,12 @@ from .data_reading import get_adjusted_data
 from .polynomial_fit import apply_poly_fit
 
 def get_diff_spectra(
-    adjusted_fluxes: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
+    adjusted_fluxes: tuple[
+        tuple[np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray]
+    ] | None = None,
     arcsec: int = 3,
     blur_step: int = 1,
     resample_step: int = 2,
@@ -20,8 +25,12 @@ def get_diff_spectra(
 
     Parameters
     ----------
-    adjusted_fluxes: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None
-        The fluxes of the 2001, 2015, 2021, and 2022 epochs.
+    adjusted_fluxes: tuple[
+        tuple[np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray]
+    ] | None
+        The fluxes and flux errors of the 2001, 2015, 2021, and 2022 epochs.
     arcsec: int
         The arcsec of the SAMI data. (must be 3 or 4)
     blur_step: int
@@ -37,8 +46,13 @@ def get_diff_spectra(
 
     Returns
     -------
-    diff_spectra: tuple[np.ndarray, np.ndarray, np.ndarray]
-        The difference spectra of the 2015, 2021, and 2022 epochs.
+    diff_spectra: tuple[
+        tuple[np.ndarray, np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray, np.ndarray],
+        np.ndarray | None
+    ]
+        The difference spectra (and errors) of the 2015, 2021, and 2022 epochs. The
+        wavelength array is also returned if the data was calculated in this function.
     """
     if adjusted_fluxes is None:
         if resample_step == 0:

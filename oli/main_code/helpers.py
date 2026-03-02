@@ -11,7 +11,7 @@ from . import constants as const
 def combine_sami_vals(
     blue_vals: list[np.ndarray],
     red_vals: list[np.ndarray],
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, ...]:
     """
     Combine the blue and red SAMI values after resampling.
 
@@ -24,7 +24,7 @@ def combine_sami_vals(
 
     Returns
     -------
-    tuple[np.ndarray]
+    tuple[np.ndarray, ...]
         The combined SAMI values.
     """
     combined_vals = []
@@ -65,7 +65,7 @@ def get_velscale(
     lam: np.ndarray,
 ) -> float:
     """
-    Get the velocity scale (as calculated in pPXF assertion).
+    Get the velocity scale (as calculated in :class:`ppxf.pPXF` assertion).
 
     Parameters
     ----------
@@ -1162,6 +1162,8 @@ def get_output_pyqsofit_file_name(
     str
         The output filename for the QSOFIT code.
     """
+    #TODO: create a dictionary (or better yet, a class) to map filenames to intuitive (output) names
+    # (as well as the year, colour, etc.) -- not just for this function
     if fname == const.FNAME_2001:
         output_name = "SDSS_2001"
     elif fname == const.FNAME_2021:
@@ -1261,7 +1263,6 @@ def get_kwargs_from_log(
                 return dict(zip(new_keys, vals))
 
 
-
 def get_scaled_y_bounds(
     y1: np.ndarray | None = None,
     y2: np.ndarray | None = None,
@@ -1270,7 +1271,7 @@ def get_scaled_y_bounds(
     fix_y2_top: bool = True,
     y_val_line_up: float = 0.0,
     y_top_scale_factor: float = 1.25
-) -> tuple[tuple[float, float], tuple[float, float]]:
+) -> tuple[tuple[float, float], tuple[float | None, float | None]]:
     """
     Get the scaled y bounds for two axes.
 
@@ -1301,6 +1302,7 @@ def get_scaled_y_bounds(
         if y1 is None:
             raise ValueError("y1 must be provided if ax1_y_bounds is None")
         y1_top = np.max(y1)*y_top_scale_factor
+        # difference between min/max and bottom/top should be the same
         y1_bottom = np.min(y1) - (y1_top - np.max(y1))
         ax1_y_bounds = (y1_bottom, y1_top)
     if ax2_y_bounds is None:
@@ -1317,13 +1319,17 @@ def get_scaled_y_bounds(
     ax1_y_range = ax1_y_bounds[1] - ax1_y_bounds[0]
     if ax1_y_range <= const.EPS:
         raise ValueError("ax1_y_bounds range too small")
+    # fraction of ax1_y_range that y_val_line_up is from the bottom of the axis
+    # after scaling, this fraction should be the same for both axes
     y_val_frac = (y_val_line_up - ax1_y_bounds[0]) / ax1_y_range
     if ax2_y_bounds[0] is None:
+        # adjust lower bound of ax2
         if ax2_y_bounds[1] is None:
             raise ValueError("Only one of ax2_y_bounds can be None")
         ax2_low = (y_val_line_up - y_val_frac * ax2_y_bounds[1]) / (1 - y_val_frac)
         return ax1_y_bounds, (ax2_low, ax2_y_bounds[1])
     elif ax2_y_bounds[1] is None:
+        # adjust upper bound of ax2
         ax2_high = (y_val_line_up + ax2_y_bounds[0] * (y_val_frac - 1)) / y_val_frac
         return ax1_y_bounds, (ax2_y_bounds[0], ax2_high)
     else:
@@ -1354,7 +1360,12 @@ def assert_lengths_match(
     all_data: dict[str, dict[str, np.ndarray]]
 ) -> None:
     """
-    Assert that all arrays in the data have the same length.
+    Assert that all arrays in the data have the same length for each epoch.
+
+    Parameters
+    ----------
+    all_data: dict[str, dict[str, np.ndarray]]
+        The data to check. See :func:`data_reading.get_adjusted_data` for structure.
     """
     for epoch_data in all_data.values():
         if isinstance(epoch_data, dict):

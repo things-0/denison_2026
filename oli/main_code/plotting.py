@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 # from matplotlib.figure import Figure
 from matplotlib.colors import Colormap
+from astropy.io import fits
 import numpy as np
 import warnings
 from pathlib import Path
@@ -40,12 +41,15 @@ def my_savefig(
 
         prefix_suffix = save_fig_name.split(".")
         if len(prefix_suffix) < 2:
+            # no extension provided, add .pdf
             save_fig_name += ".pdf"
         elif len(prefix_suffix) > 2:
             raise ValueError("too many . in save_fig_name")
         elif prefix_suffix[1] != "pdf":
+            # extension provided, make it .pdf anyway
             save_fig_name = prefix_suffix[0] + ".pdf"
         while (output_dir / save_fig_name).exists():
+            # append _cpy to the filename until it is unique
             warn_msg = f"{output_dir / save_fig_name} already exists. Creating copy"
             warnings.warn(warn_msg)
             save_fig_name = save_fig_name[:-4] + "_cpy.pdf"
@@ -99,15 +103,19 @@ def plot_vert_emission_lines(
         return
     for i, (name, lam) in enumerate(ions.items()):
         if lam_centre is None:
+            # if plotting in wavelength space, use the rest wavelength
             x_val = lam
         else:
+            # if plotting in velocity space, convert the rest wavelength to velocity
             x_val = convert_lam_to_vel(lam, lam_centre)
         if plot_x_bounds is None or (plot_x_bounds[0] < lam < plot_x_bounds[1]):
+            # only plot if it is within the plot x bounds
             ax.axvline(
                 x_val, linestyle='--', lw=0.7*const.LINEWIDTH,
                 color=vlines_cmap(i), label=name
             )
 
+#TODO: add more comments from here down (including polynomial_fit & ppxf_funcs)
 
 def plot_min_res(
     lam_sdss: np.ndarray,
@@ -152,15 +160,15 @@ def plot_min_res(
     lam15_red_max = np.max(lam15_red)
 
     if plot_RES_15_RED:
-        res_plot_bounds = [np.min(res_min), max(
+        res_plot_bounds = [np.min(res_min), np.max((
             np.max(res21), np.max(res22), 
             np.max(res01), const.RES_15_BLUE, const.RES_15_RED
-        )]
+        ))]
     else:
-        res_plot_bounds = [np.min(res_min), max(
+        res_plot_bounds = [np.min(res_min), np.max((
             np.max(res21), np.max(res22), 
             np.max(res01), const.RES_15_BLUE
-        )]
+        ))]
     lam_plot_range = np.max(lam_sdss) - lam15_blue_min
     axhline_end = (lam15_blue_max - lam15_blue_min) / lam_plot_range
 
@@ -289,7 +297,7 @@ def plot_spectra(
     sami_is_split = True if isinstance(flux15, tuple) else False
 
     plt.figure(figsize=figsize, layout=const.FIG_LAYOUT)
-    plt.plot(lam01, flux01_os, color='green', label='2001 (SDSS)', lw = const.LINEWIDTH)
+    plt.plot(lam01, flux01_os, color=const.COL_01, label='2001 (SDSS)', lw = const.LINEWIDTH)
 
     if sami_is_split:
         flux15_blue, flux15_red = flux15
@@ -299,31 +307,31 @@ def plot_spectra(
         flux15_os = (flux15_blue_os, flux15_red_os)
 
         #TODO: change colours to blue and red (and sdss to different colours) (not just for this function) 
-        # - maybe set these colours in constants.py?
-        plt.plot(lam15_blue, flux15_blue_os, color='turquoise', label='2015 blue arm (SAMI)', lw = const.LINEWIDTH)
-        plt.plot(lam15_red, flux15_red_os, color='coral', label='2015 red arm (SAMI)', lw = const.LINEWIDTH)
+        # - maybe set these colours in constants.py? (should be done now)
+        plt.plot(lam15_blue, flux15_blue_os, color='blue', label='2015 blue arm (SAMI)', lw = const.LINEWIDTH)
+        plt.plot(lam15_red, flux15_red_os, color='red', label='2015 red arm (SAMI)', lw = const.LINEWIDTH)
     else:
         flux15_os = flux15 + y_offset
 
-        plt.plot(lam15, flux15_os, color='black', label='2015 (SAMI)', lw = const.LINEWIDTH)
+        plt.plot(lam15, flux15_os, color=const.COL_15, label='2015 (SAMI)', lw = const.LINEWIDTH)
 
-    plt.plot(lam21, flux21_os, color='red', label='2021 (SDSS)', lw = const.LINEWIDTH)
-    plt.plot(lam22, flux22_os, color='blue', label='2022 (SDSS)', lw = const.LINEWIDTH)
+    plt.plot(lam21, flux21_os, color=const.COL_21, label='2021 (SDSS)', lw = const.LINEWIDTH)
+    plt.plot(lam22, flux22_os, color=const.COL_22, label='2022 (SDSS)', lw = const.LINEWIDTH)
 
     if plot_errors:
         if flux01_err is not None:
-            plt.fill_between(lam01, flux01_os - flux01_err, flux01_os + flux01_err, color='green', alpha=error_opacity)
+            plt.fill_between(lam01, flux01_os - flux01_err, flux01_os + flux01_err, color=const.COL_01, alpha=error_opacity)
         if flux15_err is not None:
             if sami_is_split:
                 flux15_blue_err, flux15_red_err = flux15_err
-                plt.fill_between(lam15_blue, flux15_blue_os - flux15_blue_err, flux15_blue_os + flux15_blue_err, color='turquoise', alpha=error_opacity)
-                plt.fill_between(lam15_red, flux15_red_os - flux15_red_err, flux15_red_os + flux15_red_err, color='coral', alpha=error_opacity)
+                plt.fill_between(lam15_blue, flux15_blue_os - flux15_blue_err, flux15_blue_os + flux15_blue_err, color='blue', alpha=error_opacity)
+                plt.fill_between(lam15_red, flux15_red_os - flux15_red_err, flux15_red_os + flux15_red_err, color='red', alpha=error_opacity)
             else:
-                plt.fill_between(lam15, flux15_os - flux15_err, flux15_os + flux15_err, color='black', alpha=error_opacity)
+                plt.fill_between(lam15, flux15_os - flux15_err, flux15_os + flux15_err, color=const.COL_15, alpha=error_opacity)
         if flux21_err is not None:
-            plt.fill_between(lam21, flux21_os - flux21_err, flux21_os + flux21_err, color='red', alpha=error_opacity)
+            plt.fill_between(lam21, flux21_os - flux21_err, flux21_os + flux21_err, color=const.COL_21, alpha=error_opacity)
         if flux22_err is not None:
-            plt.fill_between(lam22, flux22_os - flux22_err, flux22_os + flux22_err, color='blue', alpha=error_opacity)
+            plt.fill_between(lam22, flux22_os - flux22_err, flux22_os + flux22_err, color=const.COL_22, alpha=error_opacity)
 
     plot_vert_emission_lines(
         ions, plot_x_bounds=x_bounds,
@@ -581,7 +589,7 @@ def plot_diff_spectra_one_fig(
         :class:`matplotlib.pyplot` sets the bounds automatically.
     scale_axes: bool
         If True and `plot_centres` is a list of length 2, the y-axis is scaled to the
-        same bounds for all plots such that their maxima and 0 fluxes are aligned.
+        same bounds for all spectra such that their maxima and 0 fluxes are aligned.
         See :func:`get_scaled_y_bounds` for more details.
     y_top_scale_factor: float
         The factor that the max of y2 will be scaled by to create the top of the second axis.
@@ -590,7 +598,8 @@ def plot_diff_spectra_one_fig(
     colour_map: Colormap
         The colour map to use for the separate epochs and plot centres.
     n_ticks_x: int | None
-        The number of major ticks on the x-axis.
+        The number of major ticks on the x-axis. If None, :class:`matplotlib.pyplot` will set the
+        ticks automatically.
     """
 
     if isinstance(plot_centres, list) and plot_labels is not None and len(plot_centres) != len(plot_labels):
@@ -661,7 +670,6 @@ def plot_diff_spectra_one_fig(
         else:
             raise NotImplementedError("scale_axes is only supported for 2 centres")
     else:
-        # plt.xlabel(x_axis_label)
         axes = [fig.add_subplot()]
     for i in range(num_centres):
         ax = axes[i] if scale_axes else axes[0]
@@ -671,7 +679,7 @@ def plot_diff_spectra_one_fig(
             label_info = plot_labels[i]
             flux = diffs_15[i]
             flux_err = diffs_15_err[i] if diffs_15_err is not None else None
-            colour_15 = colour_map(3*i) if num_centres > 1 else 'black'
+            colour_15 = colour_map(3*i) if num_centres > 1 else const.COL_15
             ax.plot(x_15[i], flux, alpha=0.7, color=colour_15, label=f'{label_info} 2015 - 2001', lw = const.LINEWIDTH)
             
             if flux_err is not None:
@@ -680,7 +688,7 @@ def plot_diff_spectra_one_fig(
             label_info = plot_labels[i]
             flux = diffs_21[i]
             flux_err = diffs_21_err[i] if diffs_21_err is not None else None
-            colour_21 = colour_map(3*i+1) if num_centres > 1 else 'red'
+            colour_21 = colour_map(3*i+1) if num_centres > 1 else const.COL_21
             ax.plot(x_21[i], flux, alpha=0.7, color=colour_21, label=f'{label_info} 2021 - 2001', lw = const.LINEWIDTH)
             
             if flux_err is not None:
@@ -689,7 +697,7 @@ def plot_diff_spectra_one_fig(
             label_info = plot_labels[i]
             flux = diffs_22[i]
             flux_err = diffs_22_err[i] if diffs_22_err is not None else None
-            colour_22 = colour_map(3*i+2) if num_centres > 1 else 'blue'
+            colour_22 = colour_map(3*i+2) if num_centres > 1 else const.COL_22
             ax.plot(x_22[i], flux, alpha=0.7, color=colour_22, label=f'{label_info} 2022 - 2001', lw = const.LINEWIDTH)
             
             if flux_err is not None:
@@ -838,10 +846,43 @@ def plot_diff_spectra_all(
     fill_between_opacity: float
         The opacity of the region to fill between.
     plot_centres_list: list[list[float] | float]
-    
+        For each subplot, the list or float in the outer list describes the centre wavelength
+        of the plot. If a single number, this is the centre wavelength (or 0 km/s velocity) of
+        the plot. If a list, different sections of the spectrum will be overplotted on the same
+        velocity scale each with their own centre wavelength set to 0 km/s.
+    plot_labels_list: list[list[str] | None]
+        For each subplot, the elements of the outer list dictate the prefix of the epoch legend
+        labels, and, if `scale_axes` is True, the y-axis labels of the plot. 
+    use_ang_x_axis: bool
+        If True, the x axis will be in angstroms.
+    plot_y_bounds_list: list[tuple[float, float] | bool]
+        For each subplot, the tuple of (y_min, y_max), or a bool: if True the y-axis bounds are
+        set according to the corresponding `plot_centre` in `plot_centres_list` (if it is a single
+        number), else, :class:`matplotlib.pyplot` sets the bounds automatically.
+    scale_axes_list: list[bool]
+        For each subplot, if True and the corresponding `plot_centres` (within `plot_centres_list`)
+        is a list of length 2, the y-axis is scaled to the same bounds for all spectra in this plot
+        such that their maxima and 0 fluxes are aligned. See :func:`get_scaled_y_bounds` for more
+        details.
+    scale_all_axes: bool
+        If True, the spectra with the largest flux in each plot are used to scale the y-axis bounds
+        such that the maxima and 0 fluxes of these maximal spectra are aligned. See
+        :func:`get_scaled_y_bounds` for more details. Note: this is different to each argument in
+        `scale_axes_list`, which scales the y-axis bounds within a single subplot for all spectra.
+    n_ticks_x_list: list[int | None]
+        The number of major ticks on the x-axis for each subplot. If None, :class:`matplotlib.pyplot`
+        will set the ticks automatically.
+    y_top_scale_factor: float
+        The factor that the max of y2 will be scaled by to create the top of the second axis.
+    error_opacity: float
+        The opacity of the error regions.
+    colour_map: Colormap
+        The colour map to use for the separate epochs and plot centres.
+    save_fig_name: str | None
+        The name of the file to save the plot to.
+    figsize: tuple[float, float]
+        The size of the figure in inches (x, y).
     """
-    #TODO: fill in rest of docstring
-
     num_plots_options = [
         len(plot_centres_list), len(plot_labels_list),
         len(ions_list), len(n_ticks_x_list), len(scale_axes_list),
@@ -892,9 +933,9 @@ def plot_diff_spectra_all(
         all_diffs_not_none = {k: v for k, v in all_diffs.items() if v is not None}
 
         max_left_diffs_year = None
-        max_left_diffs_val = None
+        max_left_diffs_val = -np.inf
         max_right_diffs_year = None
-        max_right_diffs_val = None
+        max_right_diffs_val = -np.inf
 
         for year, diffs in all_diffs_not_none.items():
             left_diffs = diffs[0]
@@ -908,9 +949,6 @@ def plot_diff_spectra_all(
         
         left_diffs_to_scale = all_diffs_not_none[max_left_diffs_year][0]
         right_diffs_to_scale = all_diffs_not_none[max_right_diffs_year][1]
-
-        # print(f"left_diffs_to_scale: {left_diffs_to_scale}")
-        # print(f"right_diffs_to_scale: {right_diffs_to_scale}")
 
         y_bounds_1, y_bounds_2 = get_scaled_y_bounds(
             y1=left_diffs_to_scale,
@@ -971,7 +1009,9 @@ def plot_diff_spectra_all(
     my_savefig(save_fig_name, fig=fig)
     fig.show()
 
-def plot_gaussians(
+#TODO include 2x3 of gaussian fit plots or 1x2 of just total gaussian fit
+# (not all components) and relate colours to main diff spec plot
+def plot_gaussians( 
     x: np.ndarray,
     y_data: np.ndarray,
     sep_gaussian_vals: np.ndarray[np.ndarray],
@@ -1072,6 +1112,124 @@ def plot_gaussians(
     plt.show()
 
 
+def plot_ppxf_comp(
+    infile_name: str = "ppxf_components",
+    infile_suffix: str = "",
+    infile_path: Path = const.PPXF_DATA_DIR,
+    fit_is_normalised: bool = True,
+    plot_individual_gas_components: bool = False,
+    plot_all_gas_components: bool = True,
+) -> None:
+    """
+    Plots the components of a pPXF fit and the host subtracted spectrum.
+
+    Parameters
+    ----------
+    infile_name: str
+        The name of the file to read the data from: "<infile_name>_<infile_suffix>.fits".
+    infile_suffix: str
+        The suffix of the infile name: "<infile_name>_<infile_suffix>.fits".
+    infile_path: Path
+        The path to the directory containing the infile.
+    fit_is_normalised: bool
+        If True, flux will be re-multiplied by the median flux of the galaxy.
+    plot_individual_gas_components: bool
+        If True, the individual gas components are plotted on separate figures.
+    plot_all_gas_components: bool
+        If True, all gas components are plotted on a single figure.
+    """
+    if infile_suffix != "":
+        infile_suffix = "_" + infile_suffix
+    full_infile_path = infile_path / (infile_name + infile_suffix + ".fits")
+    fits.info(full_infile_path)
+    with fits.open(full_infile_path) as hdul:
+        try:
+            medflux = hdul['GALAXY'].header.get('MEDFLUX')
+        except KeyError:
+            warnings.warn("MEDFLUX not found in GALAXY header. Using 1 instead.")
+            medflux = 1
+        scale_factor = medflux if fit_is_normalised else 1
+
+        max_narrow_component = hdul['GAS_ALL'].header.get('MAX_NL_COMP')
+        if not isinstance(max_narrow_component, int):
+            raise ValueError("valid MAX_NL_COMP not found in GAS_ALL header")
+
+        lam = hdul['WAVELENGTH'].data
+        galaxy = hdul['GALAXY'].data * scale_factor
+        stellar = hdul['STELLAR'].data * scale_factor
+        bestfit = hdul['BESTFIT'].data * scale_factor
+        goodpixels = hdul['GOODPIXELS'].data
+
+        print(goodpixels)
+
+        # get gas components:
+        gas_components = {}
+        for hdu in hdul:
+            name = hdu.name
+            if name.startswith('GAS_COMP_'):
+                k = int(name.split('_')[-1])
+                gas_components[k] = hdu.data * scale_factor
+
+    
+    gas_components = dict(sorted(gas_components.items()))
+
+    if plot_individual_gas_components:
+        for k, spec in gas_components.items():
+            plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+            plt.plot(lam, spec, 'k')
+            plt.title(f'Gas component {k}')
+            plt.xlabel(r'Wavelength [$\AA$]')
+            plt.ylabel('Flux')
+            # plt.tight_layout()
+            plt.show()
+
+    if plot_all_gas_components:
+        plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+        for i, (k, spec) in enumerate(gas_components.items()):
+            plt.plot(lam, spec, 'k', color=const.ALT_COLOUR_MAP(i), label=f'Gas component {k}')
+            plt.xlabel(r'Wavelength [$\AA$]')
+            plt.ylabel('Flux')
+            # plt.tight_layout()
+        plt.title(f"All Gas components ({infile_suffix.strip('_')})")
+        plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
+        plt.show()
+        
+    # get the narrow IDs:
+    narrow_ids = [k for k in gas_components if k <= max_narrow_component]
+
+    narrow_gas = np.zeros_like(galaxy)
+    for k in narrow_ids:
+        narrow_gas += gas_components[k]
+    
+    galaxy_sub_host = galaxy - stellar - narrow_gas
+
+    # plot spectrum with host removed:
+    fig1 = plt.figure(figsize=const.FIG_SIZE, layout="constrained")
+
+    ax1 = fig1.add_subplot(2,1,1)
+    ax1.plot(lam, galaxy, 'k', label="galaxy")
+    ax1.plot(lam, bestfit, 'm', label="bestfit")
+    ax1.plot(lam, stellar, 'r', label="stellar")
+    ax1.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f"full spectrum ({infile_suffix.strip('_')})")
+    ymax = galaxy[lam > 3700].max()
+    ymin = galaxy[lam > 3700].min()
+    yrange = ymax-ymin
+    ymin=0.0
+    ax1.set(ylim=[ymin-0.05*yrange,ymax+0.05*yrange]) #, xlim=[6450, 6800])
+    ax1.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
+    
+    
+    ax2 = fig1.add_subplot(2,1,2)
+    ax2.plot(lam, galaxy_sub_host, 'k')
+    ax2.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f'host subtracted')
+    # ax2.axvline(const.OIII_STRONG, linestyle="--")
+
+    ymax = galaxy_sub_host[lam > 3700].max()
+    ymin = galaxy_sub_host[lam > 3700].min()
+    yrange = ymax-ymin
+    ax2.set(ylim=[ymin-0.05*yrange,ymax+0.05*yrange])
+    plt.show()
+
 
 
 def compare_balmer_decrements( #TODO: overplot diff spectra (remove make_new_fig arg)
@@ -1086,7 +1244,7 @@ def compare_balmer_decrements( #TODO: overplot diff spectra (remove make_new_fig
 ) -> float | None:
     """
     Compares the balmer decrements for different numbers of Gaussians and velocity bins.
-    NOTE: This function is not yet implemented.
+    NOTE: This function is not yet implemented. See GitHub history for older versions.
 
     Parameters
     ----------
@@ -1109,128 +1267,3 @@ def compare_balmer_decrements( #TODO: overplot diff spectra (remove make_new_fig
         Additional keyword arguments to pass to :func:`plot_diff_spectra`.
     """
     pass
-
-# def compare_balmer_decrements_old(
-#     results: list[list[dict[str, np.ndarray]]],
-#     num_gaussians_list: list[int],
-#     num_bins_list: list[int],
-#     year: int,
-#     colour_map: Colormap = const.COLOUR_MAP,
-#     ylim: tuple[int, int] = (0, 10),
-#     save_fig_name: str | None = "",
-#     **diff_kwargs: Any
-# ) -> float | None:
-#     bd_mean = None
-#     for i, num_bins in enumerate(num_bins_list):
-#         if diff_kwargs == {}:
-#             plt.figure(figsize=const.FIG_SIZE)
-#             bd_ax = plt.gca()
-#         else:
-#             fig, bd_ax = plt.subplots(figsize=const.FIG_SIZE)
-#             diff_ax = bd_ax.twinx()
-#         if num_bins == 1:
-#             one_bin_results = [result[i] for result in results]
-#             one_bin_bds = [result["bd"] for result in one_bin_results]
-#             bd_ax.errorbar(
-#                 x=num_gaussians_list,
-#                 y=one_bin_bds,
-#                 yerr=[result["bd_err"] for result in one_bin_results],
-#                 # make data points not connected by lines
-#                 linestyle="None",
-#                 fmt='o', capsize=4
-#             )
-#             bd_mean = np.mean(one_bin_bds)
-#             bd_ax.axhline(
-#                 bd_mean, color="purple",
-#                 lw=2*const.LINEWIDTH, label=f"Mean Balmer Decrement ({bd_mean:.2f})"
-#             )
-#             bd_ax.set_xlabel("Number of Gaussians")
-#             bd_ax.set_ylabel("Balmer Decrement")
-#             bd_ax.set_ylim(ylim)
-#             if const.PLOT_TITLES:
-#                 plt.title(f"{year} Balmer Decrement vs Number of Gaussians (no binning)")
-#             bd_ax.legend(loc="upper left")
-#             if diff_kwargs == {}:
-#                 my_savefig(save_fig_name)
-#                 plt.show()
-#             elif ("make_new_fig", False) in diff_kwargs.items():
-#                 plt.sca(diff_ax)
-#                 plot_diff_spectra(**diff_kwargs)
-#             else:
-#                 print(diff_kwargs.items())
-#                 raise ValueError("make_new_fig must be set to false if plotting diff spectra")
-#             continue
-        
-#         for j, num_gaussians in enumerate(num_gaussians_list):
-#             plt.errorbar(
-#                 x=results[j][i]["vel_centres"],
-#                 y=results[j][i]["bd"],
-#                 yerr=results[j][i]["bd_err"],
-#                 fmt='o', capsize=4,
-#                 label=f"{num_gaussians} gaussians",
-#                 color=colour_map(j)
-#             )
-#         plt.xlabel(const.VEL_LABEL)
-#         plt.ylabel("Balmer Decrement")
-#         plt.ylim(ylim)
-#         if const.PLOT_TITLES:
-#             plt.title(f"{year} Balmer Decrement vs Velocity ({num_bins} bins)")
-#         plt.legend(loc="upper left")
-#         if diff_kwargs == {}:
-#             my_savefig(save_fig_name)
-#             plt.show()
-#         elif ("make_new_fig", False) in diff_kwargs.items():
-#             plt.sca(diff_ax)
-#             plot_diff_spectra(**diff_kwargs)
-#         else:
-#             print(diff_kwargs.items())
-#             raise ValueError("make_new_fig must be set to false if plotting diff spectra")
-#     return bd_mean
-
-
-
-
-# def compare_balmer_decrements_older(
-#     balmer_decrements_0_bins: np.ndarray,
-#     balmer_decrements_many_bins: np.ndarray,
-#     vel_bin_centres_all: np.ndarray,
-#     year: int,
-#     num_bins_bounds: tuple[int, int] = (1, 7),
-#     num_gaussians_bounds: tuple[int, int] = (0, 5),
-#     colour_map: Colormap = const.COLOUR_MAP,
-#     save_fig_name: str | None = ""
-# ) -> None:
-
-#     num_bins_range = range(num_bins_bounds[0], num_bins_bounds[1] + 1)
-#     num_gaussians_range = range(num_gaussians_bounds[0], num_gaussians_bounds[1] + 1)
-#     print(f"num_bins_range: {num_bins_range}")
-#     print(f"num_gaussians_range: {num_gaussians_range}")
-
-#     plt.plot(num_gaussians_range, balmer_decrements_0_bins, color='black', label='0 bins', lw = const.LINEWIDTH)
-#     plt.xlabel("Number of Gaussians")
-#     plt.ylabel("Balmer Decrement")
-#     if const.PLOT_TITLES:
-#         plt.title(f"{year} Balmer Decrement vs Number of Gaussians")
-#     my_savefig(save_fig_name)
-#     plt.show()
-
-#     # for > 0 num_bins, plot the balmer decrement on the y axis vs the velocity on the x axis, 
-#     # with multiple dashed lines for each number of gaussians
-    
-#     for num_bins in num_bins_range:
-#         for num_gaussians in num_gaussians_range:
-#             plt.plot(
-#                 vel_bin_centres_all[num_gaussians],
-#                 balmer_decrements_many_bins[num_gaussians],
-#                 color=colour_map(num_gaussians),
-#                 label=f'{num_gaussians} gaussians',
-#                 linestyle='None',
-#                 lw = const.LINEWIDTH
-#             )
-#         plt.xlabel(const.VEL_LABEL)
-#         plt.ylabel("Balmer Decrement")
-#         if const.PLOT_TITLES:
-#             plt.title(f"{year} Balmer Decrement vs Velocity ({num_bins} bins)")
-#         plt.legend()
-#         my_savefig(save_fig_name)
-#         plt.show()

@@ -1,6 +1,5 @@
 """
 Functions for analysis of changing look AGN
-
 """
 
 from time import perf_counter as clock
@@ -89,17 +88,53 @@ def fit_agn(
     year_to_adjust: int | None = None,
     is_sdss: bool | None = None,
     sami_res: float | None = None,
-    in_file_name: str | None = None,
+    infile_name: str | None = None,
     outfile_suffix: str = "",
     outfile_dir: Path = const.PPXF_DATA_DIR,
     z: float = const.Z_SPEC,
     normalise_flux: bool = True,
     filter_bad_pixels: bool = True,
-):
+) -> None:
+    """
+    Fits a pPXF model to a spectrum and saves the results to a FITS file.
+
+    Parameters
+    ----------
+    data: dict[str, np.ndarray] | None
+        The data to fit the pPXF model to. If None, the data is created using
+        :func:`data_reading.get_adjusted_data` or (:func:`data_reading.get_sdss_data`
+        or :func:`data_reading.get_sami_data`).
+    baseline_year: int | None
+        The year to use as the baseline (calibration) flux. Must be one of 2001, 2015,
+        2021, or 2022. Should be None if `data` is provided or data is read in raw
+        using `infile_name` (no polynomial fit).
+    year_to_adjust: int | None
+        The year to adjust. Must be one of 2001, 2015, 2021, or 2022. Should be None if `data`
+        is provided or data is read in raw using `infile_name` (no polynomial fit).
+    is_sdss: bool | None
+        Specifies whether the data read in from `infile_name` is SDSS or SAMI data.
+    sami_res: float | None
+        The resolving power of the SAMI data.
+    infile_name: str | None
+        The name of the file to read the data from. Should be None if `data` is provided
+        or a polynomial fit is to be applied to the data (by specifying `year_to_adjust`
+        and `baseline_year`).
+    outfile_suffix: str
+        The suffix to add to the output file name: "ppxf_components_<outfile_suffix>.fits".
+    outfile_dir: Path
+        The directory to save the output file to.
+    z: float
+        The redshift of the galaxy.
+    normalise_flux: bool
+        If True, the flux is normalised to the median flux of the galaxy.
+    filter_bad_pixels: bool
+        If True, bad pixels are filtered out of the data (and `goodpixels` is set to
+        `np.arange(len(lam))`). See :func:`helpers.get_good_pixels` for more details.
+    """
     if data is None:
         if baseline_year is not None:
-            if in_file_name is not None:
-                raise ValueError("baseline_year provided but in_file_name is not None.")
+            if infile_name is not None:
+                raise ValueError("baseline_year provided but infile_name is not None.")
             if year_to_adjust is None:
                 raise ValueError("year_to_adjust is required if using baseline_year to get data")
             all_epochs_data = get_adjusted_data(
@@ -117,22 +152,23 @@ def fit_agn(
                 plot_adjusted=False,
             )
         else:
-            warn_msg = "Baseline year not provided. Attempting to read raw data without applying polynomial fit."
-            warnings.warn(warn_msg)
-            if in_file_name is None:
-                raise ValueError("in_file_name is required if data is not provided and baseline_year is None.")
+            # raw data without applying polynomial fit
+            if year_to_adjust is not None:
+                raise ValueError("baseline_year is required if year_to_adjust is provided.")
+            if infile_name is None:
+                raise ValueError("infile_name is required if data is not provided and baseline_year is None.")
             if is_sdss is None:
                 raise ValueError("is_sdss is required if data is not provided and baseline_year is None.")
             if is_sdss:
                 data = get_sdss_data( 
-                    file_name=in_file_name, folder_path=const.SDSS_DATA_DIR,
+                    file_name=infile_name, folder_path=const.SDSS_DATA_DIR,
                     z=z, rm_or_replace_other_bad_values=True,
                 )
             else:
                 if sami_res is None:
                     raise ValueError("sami_res is required if data is not provided, baseline_year is None, and is_sdss is False")
                 data = get_sami_data(
-                    file_name=in_file_name, folder_path=const.SAMI_DATA_DIR,
+                    file_name=infile_name, folder_path=const.SAMI_DATA_DIR,
                     z=z, perform_log_rebin=True, resolving_power=sami_res,
                     rm_or_replace_other_bad_values=True,
                 )
@@ -306,8 +342,8 @@ def fit_agn(
             lam=lam_gal, component=component,bounds=bounds, 
             gas_component=component > 0, gas_names=gas_names_all,
             lam_temp=sps.lam_temp,goodpixels=goodpixels)
-# don't use complicated constraints:
-#            constr_kinem=constr_kinem, lam_temp=sps.lam_temp)
+    # don't use complicated constraints:
+    #            constr_kinem=constr_kinem, lam_temp=sps.lam_temp)
     print(f"Elapsed time in pPXF: {(clock() - t):.2f}")
 
     
@@ -374,6 +410,29 @@ def get_nl_and_stell_cont(
     nl_gas_comp_ids: list[int] = [1, 2, 3, 4], #TODO: generalise to arbitrary number of narrow line components
     data_is_normalised: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Gets the narrow line and stellar continuum components from a pPXF fit.
+
+    Parameters
+    ----------
+    infile: str
+        The name of the file to read the data from: "<infile>_<infile_suffix>.fits".
+    infile_suffix: str
+        The suffix of the infile name: "<infile>_<infile_suffix>.fits".
+    infile_path: Path
+        The path to the directory containing the infile.
+    nl_gas_comp_ids: list[int]
+        The IDs of the narrow line components to get.
+    data_is_normalised: bool
+        If True, the data is normalised to the median flux of the galaxy.
+
+    Returns
+    -------
+    nl: np.ndarray
+        The narrow line components.
+    stell_cont: np.ndarray
+        The stellar continuum components.
+    """
     if infile_suffix != "":
         infile_suffix = "_" + infile_suffix
     actual_infile = infile_path / (infile + infile_suffix + ".fits")
@@ -402,7 +461,37 @@ def get_ha_hb_comps(
     br_gas_comp_ids: list[int] = [5, 6, 7], #TODO: generalise to arbitrary number of narrow line components
     data_is_normalised: bool = True,
     vel_width: float = const.VEL_WIDTH_GAUSSIAN_FIT
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
+    """
+    Gets the broad line components from a pPXF fit.
+
+    Parameters
+    ----------
+    infile: str
+        The name of the file to read the data from: "<infile>_<infile_suffix>.fits".
+    infile_suffix: str
+        The suffix of the infile name: "<infile>_<infile_suffix>.fits".
+    infile_path: Path
+        The path to the directory containing the infile.
+    br_gas_comp_ids: list[int]
+        The IDs of the broad line components to get.
+    data_is_normalised: bool
+        If True, the data is normalised to the median flux of the galaxy.
+    vel_width: float
+        The velocity width to use when masking the broad line flux for Hα and Hβ.
+
+    Returns
+    -------
+    ha_broad: np.ndarray
+        The summed Hα broad line components.
+    hb_broad: np.ndarray
+        The summed Hβ broad line components.
+    lam: np.ndarray
+        The wavelength array.
+    all_broad: np.ndarray
+        The broad line flux for each broad line component. Has shape
+        (`len(br_gas_comp_ids), len(lam)`).
+    """
     if infile_suffix != "":
         infile_suffix = "_" + infile_suffix
     actual_infile = infile_path / (infile + infile_suffix + ".fits")
@@ -436,114 +525,3 @@ def get_ha_hb_comps(
     hb_broad[hb_mask] = summed_broad[hb_mask]
 
     return ha_broad, hb_broad, (lam, all_broad)
-
-##########################################################
-# plot components:
-#
-def plot_fit_comp(
-    in_file_name: str = "ppxf_components",
-    in_file_suffix: str = "",
-    in_file_dir: Path = const.PPXF_DATA_DIR,
-    fit_is_normalised: bool = True,
-    plot_individual_gas_components: bool = False,
-    plot_all_gas_components: bool = True,
-):
-
-    if in_file_suffix != "":
-        in_file_suffix = "_" + in_file_suffix
-    in_file_path = in_file_dir / (in_file_name + in_file_suffix + ".fits")
-    fits.info(in_file_path)
-    with fits.open(in_file_path) as hdul:
-        try:
-            medflux = hdul['GALAXY'].header.get('MEDFLUX')
-        except KeyError:
-            warnings.warn("MEDFLUX not found in GALAXY header. Using 1 instead.")
-            medflux = 1
-        scale_factor = medflux if fit_is_normalised else 1
-
-        max_narrow_component = hdul['GAS_ALL'].header.get('MAX_NL_COMP')
-        if not isinstance(max_narrow_component, int):
-            raise ValueError("valid MAX_NL_COMP not found in GAS_ALL header")
-
-        lam = hdul['WAVELENGTH'].data
-        galaxy = hdul['GALAXY'].data * scale_factor
-        stellar = hdul['STELLAR'].data * scale_factor
-        bestfit = hdul['BESTFIT'].data * scale_factor
-        goodpixels = hdul['GOODPIXELS'].data
-
-        print(goodpixels)
-
-        # get gas components:
-        gas_components = {}
-        for hdu in hdul:
-            name = hdu.name
-            if name.startswith('GAS_COMP_'):
-                k = int(name.split('_')[-1])
-                gas_components[k] = hdu.data * scale_factor
-
-    
-    gas_components = dict(sorted(gas_components.items()))
-
-    if plot_individual_gas_components:
-        for k, spec in gas_components.items():
-            plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
-            plt.plot(lam, spec, 'k')
-            plt.title(f'Gas component {k}')
-            plt.xlabel(r'Wavelength [$\AA$]')
-            plt.ylabel('Flux')
-            # plt.tight_layout()
-            plt.show()
-
-    if plot_all_gas_components:
-        plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
-        for i, (k, spec) in enumerate(gas_components.items()):
-            plt.plot(lam, spec, 'k', color=const.ALT_COLOUR_MAP(i), label=f'Gas component {k}')
-            plt.xlabel(r'Wavelength [$\AA$]')
-            plt.ylabel('Flux')
-            # plt.tight_layout()
-        plt.title(f"All Gas components ({in_file_suffix})")
-        plt.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
-        plt.show()
-        
-    # get the narrow IDs:
-    narrow_ids = [k for k in gas_components if k <= max_narrow_component]
-
-    narrow_gas = np.zeros_like(galaxy)
-    for k in narrow_ids:
-        narrow_gas += gas_components[k]
-    
-    galaxy_sub_host = galaxy - stellar - narrow_gas
-
-    # plot spectrum with host removed:
-    fig1 = plt.figure(figsize=const.FIG_SIZE, layout="constrained")
-
-    ax1 = fig1.add_subplot(2,1,1)
-    ax1.plot(lam, galaxy, 'k', label="galaxy")
-    ax1.plot(lam, bestfit, 'm', label="bestfit")
-    ax1.plot(lam, stellar, 'r', label="stellar")
-    ax1.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f'full spectrum {in_file_suffix}')
-    ymax = galaxy[lam > 3700].max()
-    ymin = galaxy[lam > 3700].min()
-    yrange = ymax-ymin
-    ymin=0.0
-    ax1.set(ylim=[ymin-0.05*yrange,ymax+0.05*yrange]) #, xlim=[6450, 6800])
-    ax1.legend(fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
-    
-    
-    ax2 = fig1.add_subplot(2,1,2)
-    ax2.plot(lam, galaxy_sub_host, 'k')
-    ax2.set(xlabel=r'Wavelength [$\AA$]',ylabel='Flux',title=f'host subtracted')
-    # ax2.axvline(const.OIII_STRONG, linestyle="--")
-
-    ymax = galaxy_sub_host[lam > 3700].max()
-    ymin = galaxy_sub_host[lam > 3700].min()
-    yrange = ymax-ymin
-    ax2.set(ylim=[ymin-0.05*yrange,ymax+0.05*yrange])
-    # plt.tight_layout()
-    plt.show()
-        
-
-
-
-
-    
