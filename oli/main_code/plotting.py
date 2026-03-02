@@ -640,7 +640,7 @@ def plot_diff_spectra_one_fig(
     if diffs_22 is not None:
         all_diffs.append(diffs_22)
         all_years.append(2022)
-    if scale_axes: #TODO: finish setting up plot parameters
+    if scale_axes:
         if not isinstance(plot_y_bounds, bool) or plot_y_bounds == True:
             raise ValueError("plot_y_bounds must be False if using scale_axes")
         if len(all_diffs) != 1:
@@ -657,7 +657,6 @@ def plot_diff_spectra_one_fig(
             )
             ax1.set_ylim(y_bounds_1)
             ax2.set_ylim(y_bounds_2)
-            # ax1.set_xlabel(x_axis_label)
 
         else:
             raise NotImplementedError("scale_axes is only supported for 2 centres")
@@ -839,6 +838,7 @@ def plot_diff_spectra_all(
     fill_between_opacity: float
         The opacity of the region to fill between.
     plot_centres_list: list[list[float] | float]
+    
     """
     #TODO: fill in rest of docstring
 
@@ -988,7 +988,44 @@ def plot_gaussians(
     red_chi_sq: float | None = None,
     save_fig_name: str | None = ""
 ) -> None:
-    #TODO: write docstring
+    """
+    Plots the Gaussian fit to the data, showing all n Gaussians and
+    the total summed fit.
+
+    Parameters
+    ----------
+    x: np.ndarray
+        x values (e.g. wavelength array).
+    y_data: np.ndarray
+        y values (e.g. flux).
+    sep_gaussian_vals: np.ndarray[np.ndarray]
+        The values of the individual Gaussians (shape `(num_gaussians, len(x))`).
+    summed_gaussian_vals: np.ndarray
+        The values of the total summed Gaussian fit.
+    y_data_errs: np.ndarray | None
+        The errors on the y values.
+    summed_gaussian_errs: np.ndarray | None
+        The errors on the total summed Gaussian fit.
+    colour_map: Colormap
+        The colour map to use for the n different Gaussians.
+    error_opacity: float
+        The opacity of the error regions.
+    y_axis_label: str
+        The label for the y axis.
+    x_axis_label: str
+        The label for the x axis.
+    title: str | None
+        The title of the plot.
+    mask_vel_width: float | None
+        The width of the plot in velocity units. This will trim the data if
+        not None.
+    mask_lam_centre: float | None
+        The centre wavelength of the plot if trimming the data.
+    red_chi_sq: float | None
+        The reduced chi squared of the fit.
+    save_fig_name: str | None
+        The name of the file to save the plot to.
+    """
     if mask_vel_width is not None:
         if mask_lam_centre is None:
             raise ValueError("mask_lam_centre must be provided if mask_vel_width is provided")

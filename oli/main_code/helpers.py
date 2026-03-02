@@ -1031,7 +1031,6 @@ def compare_yasmeen_results(
     bh_mass_15: tuple[float, float] | None = None, #TODO: handle the case where bh_mass_xx[1] is a tuple (i.e. different lower and upper errors)
     bh_mass_21: tuple[float, float] | None = None, #TODO: handle the case where bh_mass_xx[1] is a tuple (i.e. different lower and upper errors)
 ) -> None:
-    #TODO: specify units in docstring 
     """
     Compare the results of the YASMEEN code with the results of the SSP code,
     including the Balmer decrement, BH mass, FWHM, flux, and luminosity of 2015
@@ -1040,31 +1039,31 @@ def compare_yasmeen_results(
     Parameters
     ----------
     fwhm_alpha_15: tuple[float, float] | None = None
-        The FWHM and error of the Hα line in 2015.
+        The FWHM and error of the Hα line in 2015 (km/s).
     fwhm_alpha_21: tuple[float, float] | None = None
-        The FWHM and error of the Hα line in 2021.
+        The FWHM and error of the Hα line in 2021 (km/s).
     fwhm_beta_15: tuple[float, float] | None = None
-        The FWHM and error of the Hβ line in 2015.
+        The FWHM and error of the Hβ line in 2015 (km/s).
     fwhm_beta_21: tuple[float, float] | None = None
-        The FWHM and error of the Hβ line in 2021.
+        The FWHM and error of the Hβ line in 2021 (km/s).
     flux_alpha_15: tuple[float, float] | None = None
-        The flux and error of the Hα line in 2015.
+        The flux and error of the Hα line in 2015 (10^-17 ergs/s/cm^2).
     flux_alpha_21: tuple[float, float] | None = None
-        The flux and error of the Hα line in 2021.
+        The flux and error of the Hα line in 2021 (10^-17 ergs/s/cm^2).
     luminosity_alpha_15: tuple[float, float] | None = None
-        The luminosity and error of the Hα line in 2015.
+        The luminosity and error of the Hα line in 2015 (10^40 ergs/s).
     luminosity_alpha_21: tuple[float, float] | None = None
-        The luminosity and error of the Hα line in 2021.
+        The luminosity and error of the Hα line in 2021 (10^40 ergs/s).
     bd_15: tuple[float, float] | None = None
         The Balmer decrement and error of the Hα line in 2015.
     bd_21: tuple[float, float] | None = None
         The Balmer decrement and error of the Hα line in 2021.
     bh_mass_15: tuple[float, float] | None = None
-        The BH mass and error of the Hα line in 2015. Note, error can be
-        a single ± value or a tuple of (lower error, upper error).
+        The BH mass and error of the Hα line in 2015 (10^6 M_sun). Note, error
+        can be a single ± value or a tuple of (lower error, upper error).
     bh_mass_21: tuple[float, float] | None = None
-        The BH mass and error of the Hα line in 2021. Note, error can be
-        a single ± value or a tuple of (lower error, upper error).
+        The BH mass and error of the Hα line in 2021 (10^6 M_sun). Note, error
+        can be a single ± value or a tuple of (lower error, upper error).
     """
 
     all_results = {

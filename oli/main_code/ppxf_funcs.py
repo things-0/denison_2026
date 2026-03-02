@@ -371,7 +371,7 @@ def get_nl_and_stell_cont(
     infile: str = "ppxf_components",
     infile_suffix: str = "",
     infile_path: Path = const.PPXF_DATA_DIR,
-    nl_gas_comp_ids: list[int] = [1, 2, 3, 4],
+    nl_gas_comp_ids: list[int] = [1, 2, 3, 4], #TODO: generalise to arbitrary number of narrow line components
     data_is_normalised: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
     if infile_suffix != "":
@@ -393,7 +393,7 @@ def get_nl_and_stell_cont(
             nl *= medflux
             stell_cont *= medflux
 
-    return nl, stell_cont, (lam)
+    return nl, stell_cont
 
 def get_ha_hb_comps(
     infile: str = "ppxf_components",
