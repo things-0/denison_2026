@@ -98,14 +98,14 @@ def get_diff_spectra(
             adjusted_data_01["flux_error"], adjusted_data_15["flux_error"],
             adjusted_data_21["flux_error"], adjusted_data_22["flux_error"]
         )
-        last_valid_lam_idx_01, last_valid_lam_idx_15, last_valid_lam_idx_21, last_valid_lam_idx_22 = (
-            adjusted_data_01["last_valid_lam_idx"], adjusted_data_15["last_valid_lam_idx"],
-            adjusted_data_21["last_valid_lam_idx"], adjusted_data_22["last_valid_lam_idx"]
+        last_valid_idx_01, last_valid_idx_15, last_valid_idx_21, last_valid_idx_22 = (
+            adjusted_data_01["last_valid_idx"], adjusted_data_15["last_valid_idx"],
+            adjusted_data_21["last_valid_idx"], adjusted_data_22["last_valid_idx"]
         )
         # clip lam in case polynomial fit created invalid fluxes beyond max lam of baseline (2015)
         lam_adjusted = lam[:int(np.nanmin((
-            last_valid_lam_idx_01, last_valid_lam_idx_15,
-            last_valid_lam_idx_21, last_valid_lam_idx_22
+            last_valid_idx_01, last_valid_idx_15,
+            last_valid_idx_21, last_valid_idx_22
         )))]
     else:
         (

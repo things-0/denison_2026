@@ -16,16 +16,49 @@ def get_polynom_fit(
     bin_by_med: bool = True,
     plot_result: bool = True,
 ) -> tuple[np.poly1d, np.ndarray]:
+    """
+    Fits a polynomial to some data and returns the polynomial object and the
+    polynomial values corresponding to the input lambdas. Polynomial is optionally
+    applied to the binned median of the values to reduce the effect of noise.
+
+    Parameters
+    ----------
+    lambdas: np.ndarray
+        The wavelengths of the data.
+    vals: np.ndarray
+        The data values. e.g. the flux ratio
+    year_to_adjust: int
+        The year to adjust. Must be one of 2001, 2015, 2021, or 2022.
+    baseline_year: int
+        The year to use as the baseline (calibration) flux. Must be one of 2001, 2015, 2021, or 2022.
+    degree: float
+        The degree of the polynomial to fit.
+    bin_width: float
+        The width of the bins to use if `bin_by_med` is True.
+    bin_by_med: bool
+        If True, the vals are grouped into bins according to the median val of each bin.
+    plot_result: bool
+        If True, the polynomial fit to the data is plotted.
+    
+    Returns
+    -------
+    tuple[np.poly1d, np.ndarray]
+        The polynomial object and the polynomial values corresponding to the input lambdas.
+    """
     if bin_by_med:
         binned_lambdas, binned_vals, binned_val_errs = bin_data_by_median(lambdas, vals, bin_width)
         new_vals, new_lambdas = binned_vals, binned_lambdas
     else:
-        binned_lambdas, binned_vals = None, None
         new_vals, new_lambdas = vals, lambdas
+        # set to None so they are not plotted
+        binned_lambdas, binned_vals = None, None
 
     valid_mask = np.isfinite(new_vals)
+    # get the coefficients of the polynomial fit
     coefficients = np.polyfit(new_lambdas[valid_mask], new_vals[valid_mask], degree)
+    # create the polynomial object
     polynom = np.poly1d(coefficients)
+    # evaluate the polynomial at the input lambdas
     polynom_vals = polynom(new_lambdas)
 
     valid_indices = np.where(valid_mask)[0]
@@ -36,6 +69,7 @@ def get_polynom_fit(
     outer_mask[:first_valid] = True
     outer_mask[last_valid + 1:] = True
 
+    # set the polynomial values outside the valid range to NaN (rather than extrapolating from the polynom object and lambdas)
     polynom_vals[outer_mask] = np.nan
 
     if plot_result:
@@ -126,7 +160,7 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
     -------
     to_return: dict[str, np.ndarray | np.poly1d | int | None]
         A dictionary with the keys "polynom", "flux", "flux_error",
-        "last_valid_lam_idx", and values calculated from
+        "last_valid_idx", and values calculated from
         :func:`data_reading.get_adjusted_data`, including "fwhm_per_pix",
         "good_pixels", "velscale", "lam".
     """
@@ -141,18 +175,6 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
         resample_step=resample_step,
     ) if data is None else data
 
-    # lam, (data01, data15, data21, data22) = data
-
-    # data_map = {
-    #     2022: data22,
-    #     2021: data21,
-    #     2015: data15,
-    #     2001: data01
-    # }
-
-    # flux, err = data_map.get(year_to_adjust)
-    # baseline_flux, baseline_err = data_map.get(baseline_year)
-
     lam = data["lam"]
     flux = data[f"{year_to_adjust}"]["flux"]
     err = data[f"{year_to_adjust}"]["flux_error"]
@@ -164,7 +186,7 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
         "polynom": None,
         "flux": flux,
         "flux_error": err,
-        "last_valid_lam_idx": np.nan,
+        "last_valid_idx": np.nan,
         "fwhm_per_pix": data[f"{year_to_adjust}"]["fwhm_per_pix"],
         "good_pixels": data[f"{year_to_adjust}"]["good_pixels"],
         "velscale": data[f"{year_to_adjust}"]["velscale"],
@@ -172,14 +194,16 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
 
     if year_to_adjust == baseline_year:
         if extrapolate_beyond_max_baseline_lam:
+            # don't apply the polynomial fit since no recalibration is required
             return to_return
-        last_valid_lam_idx = int(np.where(np.isfinite(flux))[0][-1])
-        to_return["flux"] = flux[:last_valid_lam_idx]
-        to_return["flux_error"] = err[:last_valid_lam_idx]
-        to_return["last_valid_lam_idx"] = last_valid_lam_idx
-        to_return["lam"] = lam[:last_valid_lam_idx]
-        to_return["fwhm_per_pix"] = to_return["fwhm_per_pix"][:last_valid_lam_idx]
-        to_return["good_pixels"] = to_return["good_pixels"][to_return["good_pixels"] < last_valid_lam_idx]
+        # trim the data to the valid range (to match the trimming done as if the polyfit was actually applied and extraplotation was avoided)
+        last_valid_idx = int(np.where(np.isfinite(flux))[0][-1])
+        to_return["flux"] = flux[:last_valid_idx]
+        to_return["flux_error"] = err[:last_valid_idx]
+        to_return["last_valid_idx"] = last_valid_idx
+        to_return["lam"] = lam[:last_valid_idx]
+        to_return["fwhm_per_pix"] = to_return["fwhm_per_pix"][:last_valid_idx]
+        to_return["good_pixels"] = to_return["good_pixels"][to_return["good_pixels"] < last_valid_idx]
         return to_return
 
     actual_ratio_flux = flux / baseline_flux
@@ -192,11 +216,13 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
 
     for start, end in lambdas_to_ignore:
         current_range_mask = (lam >= start) & (lam <= end)
-        balmer_mask = balmer_mask | current_range_mask
+        balmer_mask = balmer_mask | current_range_mask # include anything around Hα or Hβ in the balmer mask
 
     actual_ratio_flux_removed = np.copy(actual_ratio_flux)
+    # actual flux ratio, but only the balmer regions are kept (everything else is set to NaN)
     actual_ratio_flux_removed[~balmer_mask] = np.nan
 
+    # actual flux ratio, but balmer regions are set to NaN
     actual_ratio_flux[balmer_mask] = np.nan
 
     ratio_title = f"Spectral flux density ratio of {year_to_adjust} to {baseline_year}"
@@ -220,17 +246,21 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
         bin_width=bin_width, plot_result=plot_poly_ratio,
     )
 
+    # apply the inverse of the polynomial to ~ match the flux between epochs
     adjusted_flux = flux / polynom(lam)
     adjusted_err = err / polynom(lam)
 
     if not extrapolate_beyond_max_baseline_lam:
-        last_valid_lam_idx = int(np.where(np.isfinite(actual_ratio_flux))[0][-1])
-        adjusted_flux = adjusted_flux[:last_valid_lam_idx]
-        adjusted_err = adjusted_err[:last_valid_lam_idx]
-        adjusted_lam = lam[:last_valid_lam_idx]
+        # even though one of the epochs' flux may be finite, if any is not finite after a certain wavelength
+        # (i.e. SAMI since it has lower wavelength coverage than SDSS), then the extrapolated polynomial and
+        # adjusted flux values become unusable very quickly, so these values are clipped
+        last_valid_idx = int(np.where(np.isfinite(actual_ratio_flux))[0][-1])
+        adjusted_flux = adjusted_flux[:last_valid_idx]
+        adjusted_err = adjusted_err[:last_valid_idx]
+        adjusted_lam = lam[:last_valid_idx]
     else:
         adjusted_lam = lam
-        last_valid_lam_idx = len(lam)
+        last_valid_idx = len(lam) # all indices are "valid" (no extrapolation)
 
     if plot_adjusted:
         adjusted_plot_title = f"Spectral flux density of {year_to_adjust} (polynomial fit to {baseline_year})"
@@ -251,8 +281,8 @@ def apply_poly_fit( #TODO: update other params as well (medflux, etc.)
     to_return["polynom"] = polynom
     to_return["flux"] = adjusted_flux
     to_return["flux_error"] = adjusted_err
-    to_return["last_valid_lam_idx"] = last_valid_lam_idx
-    to_return["lam"] = lam[:last_valid_lam_idx]
-    to_return["fwhm_per_pix"] = to_return["fwhm_per_pix"][:last_valid_lam_idx]
-    to_return["good_pixels"] = to_return["good_pixels"][to_return["good_pixels"] < last_valid_lam_idx]
+    to_return["last_valid_idx"] = last_valid_idx
+    to_return["lam"] = lam[:last_valid_idx]
+    to_return["fwhm_per_pix"] = to_return["fwhm_per_pix"][:last_valid_idx]
+    to_return["good_pixels"] = to_return["good_pixels"][to_return["good_pixels"] < last_valid_idx]
     return to_return
