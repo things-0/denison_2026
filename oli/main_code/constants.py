@@ -113,11 +113,13 @@ DOUBLE_TEXT_SIZE = DOUBLE_FIG_SIZE[0] * TEXT_SCALE_FACTOR / LATEX_SINGLE_TO_DOUB
 ERR_OPAC = 0.1
 FILL_BETWEEN_OPAC = 0.5
 COLOUR_MAP = plt.cm.tab10
-ALT_COLOUR_MAP = plt.cm.tab20
+ALT_COLOUR_MAP = plt.cm.Set1
 COL_01 = "green"
 COL_15 = "purple"
 COL_21 = "black"
 COL_22 = "orange"
+COL_RED = "red"
+COL_BLUE = "blue"
 FIG_LAYOUT = "constrained"
 
 VEL_WIDTH_GAUSSIAN_FIT = VEL_PLOT_WIDTH
@@ -171,6 +173,49 @@ arms, equivalent to an effective velocity dispersion of σ of 70.4 and
 RES_15_BLUE = 1808
 RES_15_RED = 4304
 
+EPOCHS_INFO = { #TODO: implement this properly or use a "Spectrum" class instead of dictionaries?
+# (attributes like lam, flux_as_is, flux_blurred, flux_resampled, flux_polyfit, flux_err, fwhm, velscale, etc.)
+    "2001": {
+        "colour": COL_01,
+        "arcsec": 3,
+        "filename": FNAME_2001,
+    },
+    "2015": {
+        "colour": COL_15,
+        "arcsec": 3,
+        "filename": (FNAME_2015_BLUE_3_ARCSEC, FNAME_2015_RED_3_ARCSEC),
+    },
+    "2021": {
+        "colour": COL_21,
+        "arcsec": 3,
+        "filename": FNAME_2021,
+    },
+    "2022": {
+        "colour": COL_22,
+        "arcsec": 3,
+        "filename": FNAME_2022,
+    },
+    "2015_blue": {
+        "colour": COL_BLUE,
+        "arcsec": 3,
+        "filename": FNAME_2015_BLUE_3_ARCSEC,
+    },
+    "2015_red": {
+        "colour": COL_RED,
+        "arcsec": 3,
+        "filename": FNAME_2015_RED_3_ARCSEC,
+    },
+    "2015_blue_4_arcsec": {
+        "colour": COL_BLUE,
+        "arcsec": 4,
+        "filename": FNAME_2015_BLUE_4_ARCSEC,
+    },
+    "2015_red_4_arcsec": {
+        "colour": COL_RED,
+        "arcsec": 4,
+        "filename": FNAME_2015_RED_4_ARCSEC,
+    },
+}
 
 # PyQSOFit parameters
 FIT_KEYS = [

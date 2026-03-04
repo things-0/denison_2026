@@ -31,6 +31,11 @@ def my_savefig(
         The figure object to save. If None, the current figure is used.
     """
     my_fig = plt.gcf() if fig is None else fig
+    fig_size = my_fig.get_size_inches()
+    if tuple(fig_size) not in (const.FIG_SIZE, const.DOUBLE_FIG_SIZE):
+        warn_msg = f"figure size {fig_size} is not const.FIG_SIZE {const.FIG_SIZE} or "
+        warn_msg += f"const.DOUBLE_FIG_SIZE {const.DOUBLE_FIG_SIZE}"
+        warnings.warn(warn_msg)
     # my_fig.tight_layout() # use "constrained" instead when first creating the figure
     if const.SAVE_FIGS and save_fig_name is not None and save_fig_name != "":
         # check if output_dir exists, if not create it
@@ -62,7 +67,7 @@ def plot_vert_emission_lines(
     fill_between_bounds: tuple[float, float] | None = None,
     fill_between_label: str | None = None,
     fill_between_opacity: float = 0.5,
-    vlines_cmap: Colormap = const.COLOUR_MAP,
+    vlines_cmap: Colormap = const.ALT_COLOUR_MAP,
     lam_centre: float | None = None,
     ax: plt.Axes | None = None
 ) -> None:
@@ -160,17 +165,19 @@ def plot_min_res(
     lam15_red_max = np.max(lam15_red)
 
     if plot_RES_15_RED:
+        # y_bounds of the SAMI rectangle coverage
         res_plot_bounds = [np.min(res_min), np.max((
             np.max(res21), np.max(res22), 
             np.max(res01), const.RES_15_BLUE, const.RES_15_RED
         ))]
     else:
+        # y_bounds of the SAMI rectangle coverage
         res_plot_bounds = [np.min(res_min), np.max((
             np.max(res21), np.max(res22), 
             np.max(res01), const.RES_15_BLUE
         ))]
-    lam_plot_range = np.max(lam_sdss) - lam15_blue_min
-    axhline_end = (lam15_blue_max - lam15_blue_min) / lam_plot_range
+    # lam_plot_range = np.max(lam_sdss) - lam15_blue_min
+    # axhline_end = (lam15_blue_max - lam15_blue_min) / lam_plot_range
 
     plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
     plt.axhline(
@@ -290,6 +297,7 @@ def plot_spectra(
         The name of the figure to save.
     """
     
+    # define offset fluxes
     flux01_os = flux01
     flux21_os = flux21 + 2 * y_offset
     flux22_os = flux22 + 3 * y_offset
@@ -303,14 +311,14 @@ def plot_spectra(
         flux15_blue, flux15_red = flux15
         lam15_blue, lam15_red = lam15
 
+        # define offset fluxes
         flux15_blue_os, flux15_red_os = flux15_blue + y_offset, flux15_red + y_offset
         flux15_os = (flux15_blue_os, flux15_red_os)
 
-        #TODO: change colours to blue and red (and sdss to different colours) (not just for this function) 
-        # - maybe set these colours in constants.py? (should be done now)
         plt.plot(lam15_blue, flux15_blue_os, color='blue', label='2015 blue arm (SAMI)', lw = const.LINEWIDTH)
         plt.plot(lam15_red, flux15_red_os, color='red', label='2015 red arm (SAMI)', lw = const.LINEWIDTH)
     else:
+        # define offset flux
         flux15_os = flux15 + y_offset
 
         plt.plot(lam15, flux15_os, color=const.COL_15, label='2015 (SAMI)', lw = const.LINEWIDTH)
@@ -352,11 +360,13 @@ def plot_spectra(
     plt.ylabel(y_axis_label)
     if title is not None and const.PLOT_TITLES:
         plt.title(title)
+    # scale legend font size according to figure size
     if figsize == const.DOUBLE_FIG_SIZE:
         leg_font_size = const.LEGEND_SCALE_FACTOR * const.DOUBLE_TEXT_SIZE
     elif figsize == const.FIG_SIZE:
         leg_font_size = const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE
     else:
+        # use default matplotlib legend font size
         leg_font_size = None
     if legend_loc is not None:
         plt.legend(loc=legend_loc, fontsize=leg_font_size)
@@ -425,11 +435,14 @@ def plot_polynomial_ratio(
 
     if plot_selection:
         ratio_label = 'Spectral flux density ratio'
+        # plot the balmer vals_removed
         plt.plot(lambdas, vals_removed, color='red', label=f'{ratio_label} (ignored Balmer)', lw = const.LINEWIDTH)
     else:
         ratio_label = 'actual ratio'
+        # plot the polynomial fit (only when vals_removed aren't plotted)
         plt.plot(binned_lambdas, polynom_vals, color='red', label=poly_label, lw=2*const.LINEWIDTH)
 
+    # plot the actual ratio
     plt.plot(lambdas, vals, alpha=0.4, color='black', label=ratio_label, lw = 0.5*const.LINEWIDTH)
     plt.xlabel(const.REST_ANG_LABEL)
     plt.ylabel("Ratio")
@@ -609,14 +622,17 @@ def plot_diff_spectra_one_fig(
 
     num_centres = len(plot_centres) if isinstance(plot_centres, list) else 1
     if plot_labels is None:
+        # add nothing to the y axis or legend labels 
         plot_labels = [""] * num_centres
 
     if use_ang_x_axis:
         if isinstance(plot_centres, list):
             raise ValueError("plot_centres must be a single number if use_ang_x_axis is True")
 
+
         x_axis_label = const.REST_ANG_LABEL
         x_15, x_21, x_22 = [lam], [lam], [lam]
+        # not overplotting different velocity centres on top of each other
         diffs_15 = [diff_15] if diff_15 is not None else None
         diffs_21 = [diff_21] if diff_21 is not None else None
         diffs_22 = [diff_22] if diff_22 is not None else None
@@ -627,6 +643,8 @@ def plot_diff_spectra_one_fig(
         if vel_plot_width is None:
             raise ValueError("use_ang_x_axis must be True if vel_plot_width is None")
         x_axis_label = const.VEL_LABEL
+        # each diffs_xx is a list of difference spectra for a single epoch, each with a different plot centre
+        # (or None if diff_xx is None)
         x_15, diffs_15, diffs_15_err = convert_to_vel_data(
             lam, diff_15, diff_15_err, plot_centres, vel_plot_width
         )
@@ -638,30 +656,28 @@ def plot_diff_spectra_one_fig(
         )
 
 
-    all_diffs = []
-    all_years = []
-    if diffs_15 is not None:
-        all_diffs.append(diffs_15)
-        all_years.append(2015)
-    if diffs_21 is not None:
-        all_diffs.append(diffs_21)
-        all_years.append(2021)
-    if diffs_22 is not None:
-        all_diffs.append(diffs_22)
-        all_years.append(2022)
+    all_diffs = {
+        "2015": (x_15, diffs_15, diffs_15_err),
+        "2021": (x_21, diffs_21, diffs_21_err),
+        "2022": (x_22, diffs_22, diffs_22_err)
+    }
+    # only keep epochs with not None difference spectra
+    all_diffs_not_none = {k: v for k, v in all_diffs.items() if v[1] is not None}
     if scale_axes:
         if not isinstance(plot_y_bounds, bool) or plot_y_bounds == True:
             raise ValueError("plot_y_bounds must be False if using scale_axes")
-        if len(all_diffs) != 1:
+        if len(all_diffs_not_none) != 1:
             raise ValueError("One of diffs_15, diffs_21, diffs_22 must be not None if using scale_axes")
+        year, (_, diffs_xx, _) = next(iter(all_diffs_not_none.items()))
         if num_centres == 2:
+            # diffs_xx has 2 difference spectra
             ax1 = fig.add_subplot()
-            # ax1 = fig.subplots()
             ax2 = ax1.twinx()
             axes = [ax1, ax2]
+            # scale bounds between both plots in this (sub)figure
             y_bounds_1, y_bounds_2 = get_scaled_y_bounds(
-                y1=all_diffs[0][0],
-                y2=all_diffs[0][1],
+                y1=diffs_xx[0],
+                y2=diffs_xx[1],
                 y_top_scale_factor=y_top_scale_factor
             )
             ax1.set_ylim(y_bounds_1)
@@ -670,41 +686,40 @@ def plot_diff_spectra_one_fig(
         else:
             raise NotImplementedError("scale_axes is only supported for 2 centres")
     else:
+        # get axis for the current figure (store as list for iterations below)
         axes = [fig.add_subplot()]
     for i in range(num_centres):
-        ax = axes[i] if scale_axes else axes[0]
+        ax = axes[i] if scale_axes else axes[0] # only one axis if not scaling axes
+        label_info = plot_labels[i] # prefix of the epoch legend labels to denote plot centres. e.g. "Hα" or "Hβ"
+        # set the number of major ticks on the x-axis
         if n_ticks_x is not None:
             ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=n_ticks_x))
-        if diffs_15 is not None:
-            label_info = plot_labels[i]
-            flux = diffs_15[i]
-            flux_err = diffs_15_err[i] if diffs_15_err is not None else None
-            colour_15 = colour_map(3*i) if num_centres > 1 else const.COL_15
-            ax.plot(x_15[i], flux, alpha=0.7, color=colour_15, label=f'{label_info} 2015 - 2001', lw = const.LINEWIDTH)
+        for j, (year, (x_xx, diffs_xx, diffs_xx_err)) in enumerate(
+            all_diffs_not_none.items()
+        ):
+            if diffs_xx is None:
+                continue
+            # get the current flux, wavelength, and error for the i-th plot centre of the xx epoch
+            cur_flux = diffs_xx[i]
+            cur_lam = x_xx[i]
+            cur_flux_err = diffs_xx_err[i] if diffs_xx_err is not None else None
             
-            if flux_err is not None:
-                ax.fill_between(x_15[i], flux - flux_err, flux + flux_err, color=colour_15, alpha=error_opacity)
-        if diffs_21 is not None:
-            label_info = plot_labels[i]
-            flux = diffs_21[i]
-            flux_err = diffs_21_err[i] if diffs_21_err is not None else None
-            colour_21 = colour_map(3*i+1) if num_centres > 1 else const.COL_21
-            ax.plot(x_21[i], flux, alpha=0.7, color=colour_21, label=f'{label_info} 2021 - 2001', lw = const.LINEWIDTH)
+            if num_centres == 2:
+                # use red or blue, depending on which wavelength is longer (larger)
+                colour = const.COL_RED if plot_centres[i] > plot_centres[(i+1)%2] else const.COL_BLUE
+            elif num_centres > 2:
+                colour = colour_map(len(all_diffs_not_none)*i+j)
+            else:
+                colour = const.EPOCHS_INFO[year]["colour"]
+                
+            ax.plot(cur_lam, cur_flux, alpha=0.7, color=colour, label=f'{label_info} {year} - 2001', lw = const.LINEWIDTH)
             
-            if flux_err is not None:
-                ax.fill_between(x_21[i], flux - flux_err, flux + flux_err, color=colour_21, alpha=error_opacity)
-        if diffs_22 is not None:
-            label_info = plot_labels[i]
-            flux = diffs_22[i]
-            flux_err = diffs_22_err[i] if diffs_22_err is not None else None
-            colour_22 = colour_map(3*i+2) if num_centres > 1 else const.COL_22
-            ax.plot(x_22[i], flux, alpha=0.7, color=colour_22, label=f'{label_info} 2022 - 2001', lw = const.LINEWIDTH)
-            
-            if flux_err is not None:
-                ax.fill_between(x_22[i], flux - flux_err, flux + flux_err, color=colour_22, alpha=error_opacity)
+            if cur_flux_err is not None:
+                ax.fill_between(cur_lam, cur_flux - cur_flux_err, cur_flux + cur_flux_err, color=colour, alpha=error_opacity)
 
     if isinstance(ions, bool):
         if ions:
+            # set ions automatically
             ions_near_h_alpha = {
                 const.HA_LATEX: const.H_ALPHA,
                 const.SII_BLUE_LATEX: const.SII_BLUE,
@@ -717,12 +732,14 @@ def plot_diff_spectra_one_fig(
                 const.OIII_RED_LATEX: const.OIII_RED
             }
             if isinstance(plot_centres, list):
+                # plot any lines near the plot centres (in velocity space so these lines will be confusing - warning given below)
                 ions = {}
                 if const.H_ALPHA in plot_centres:
                     ions = ions | ions_near_h_alpha
                 if const.H_BETA in plot_centres:
                     ions = ions | ions_near_h_beta
             else:
+                # plot any lines near the plot centre
                 if plot_centres == const.H_ALPHA:
                     ions = ions_near_h_alpha
                 elif plot_centres == const.H_BETA:
@@ -730,12 +747,17 @@ def plot_diff_spectra_one_fig(
                 else:
                     ions = None
         else:
+            # don't set ions automatically
             ions = None
+    # else leave ions as a dict
 
-    if use_ang_x_axis:        
+    if use_ang_x_axis:   
+        # already verified that plot_centres is not a list if use_ang_x_axis is True     
         x_bounds = get_lam_bounds(plot_centres, vel_plot_width, width_is_vel=True) if vel_plot_width is not None else None
+        # not plotting in velocity space, so plot_vert_emission_lines does not need a lam_centre to convert to velocity
         lam_centre = None
     else:
+        # arbitrarilychoose first plot centre (warn below)
         lam_centre = plot_centres[0] if isinstance(plot_centres, list) else plot_centres
         x_bounds = (-vel_plot_width / 2, vel_plot_width / 2) if vel_plot_width is not None else None
         
@@ -752,33 +774,46 @@ def plot_diff_spectra_one_fig(
         )
         warnings.warn(warn_msg)
 
+    # plot horizontal lines
     if hlines is not None:
         for i, (name, val) in enumerate(hlines.items()):
             plt.axhline(val, color=colour_map(i), linestyle='--', lw=const.LINEWIDTH, label=name)
 
     if isinstance(plot_y_bounds, tuple):
+        # use user-provided y-axis bounds
         plt.ylim(plot_y_bounds[0], plot_y_bounds[1])
-    elif plot_y_bounds:
+    elif plot_y_bounds and not scale_axes:
+        # set y-axis bounds automatically based on the plot centre
+        # (don't adjust ylim if scale_axes is True as this is already done above)
         if not isinstance(plot_centres, list):
             if plot_centres == const.H_ALPHA:
                 plt.ylim(-5, 30)
             elif plot_centres == const.H_BETA:
+                # typically not as much flux around Hβ
                 plt.ylim(-6, 9)
-        elif not scale_axes:
+        else:
+            # if using multiple plot centres, (-5, 30) is a good default to cover most data
             plt.ylim(-5, 30)
 
     plt.axhline(0, color='black', linestyle='--', alpha=0.5, lw=const.LINEWIDTH)
-    title = "" if len(all_years) != 1 else f"{all_years[0]} "
+    title = "" if len(all_diffs_not_none) != 1 else f"{year} "
     title += "Spectral flux density difference from 2001"
     for i, ax in enumerate(axes):
         if scale_axes:
+            # prefix of y-axis label to denote plot centres. e.g. "Hα" or "Hβ"
             y_axis_label = f"{plot_labels[i]}   {const.SFD_Y_AX_LABEL}"
             ax.set_ylabel(y_axis_label)
+            # set to None so that plot_diff_spectra_all adds a y-axis label for each subplot
+            # and doesn't set a sup y axis label
             y_axis_label = None
         else:
+            # don't set a y-axis label for each subplot
+            # let plot_diff_spectra_all set a sup y axis label
             y_axis_label = const.SFD_Y_AX_LABEL
+        # axes is length 2 if scale_axes is True, otherwise length 1
+        # split the legend between the two axes if scale_axes is True to clearly show which axis is 
+        # which, since the different legends will contain the plot labels info (e.g. "Hα" or "Hβ")
         loc = "upper left" if i == 0 else "upper right"
-        # loc = "best" if i == 0 else "upper right"
         ax.legend(loc=loc, fontsize=const.LEGEND_SCALE_FACTOR * const.TEXT_SIZE)
     return x_axis_label, y_axis_label, title
 
@@ -914,6 +949,8 @@ def plot_diff_spectra_all(
             if isinstance(plot_centres, list):
                 raise ValueError("plot_centres_list must be a list of single numbers if scale_all_axes is True")
 
+        # each diffs_xx is a list of difference spectra for a single epoch, each with a different plot centre
+        # (or None if diff_xx is None)
         x_15, diffs_15, diffs_15_err = convert_to_vel_data(
             lam, diff_15, diff_15_err, plot_centres_list, vel_plot_width
         )
@@ -925,12 +962,15 @@ def plot_diff_spectra_all(
         )
 
         all_diffs = {
-            "15": diffs_15,
-            "21": diffs_21,
-            "22": diffs_22
+            "2015": diffs_15,
+            "2021": diffs_21,
+            "2022": diffs_22
         }
-
+        # only keep epochs with not None difference spectra
         all_diffs_not_none = {k: v for k, v in all_diffs.items() if v is not None}
+
+        # find the epoch with the largest flux in the first (left) plot and the epoch with the largest flux in the second (right) plot
+        # (gauranteed only 2 plots above)
 
         max_left_diffs_year = None
         max_left_diffs_val = -np.inf
@@ -947,6 +987,7 @@ def plot_diff_spectra_all(
                 max_right_diffs_year = year
                 max_right_diffs_val = np.max(right_diffs)
         
+        # pick the difference spectra to use when scaling the y-axis bounds (can only choose 2 (functional limitation of get_scaled_y_bounds))
         left_diffs_to_scale = all_diffs_not_none[max_left_diffs_year][0]
         right_diffs_to_scale = all_diffs_not_none[max_right_diffs_year][1]
 
@@ -959,8 +1000,9 @@ def plot_diff_spectra_all(
         plot_y_bounds_list = [y_bounds_1, y_bounds_2]
 
 
-    subfigs = fig.subfigures(1, num_plots) 
+    subfigs = fig.subfigures(nrows=1, ncols=num_plots)
     if not isinstance(subfigs, np.ndarray):
+        # make iterable
         subfigs = np.array([subfigs])
 
     x_axis_labels = np.zeros(num_plots, dtype=object)
@@ -1002,10 +1044,10 @@ def plot_diff_spectra_all(
     if not np.all(titles == titles[0]):
         raise ValueError(f"conflicting titles: {titles}")
     if const.PLOT_TITLES:
-        fig.suptitle(titles[0])
-    fig.supxlabel(x_axis_labels[0])
+        fig.suptitle(titles[0]) # pick the first one since they are all the same
+    fig.supxlabel(x_axis_labels[0]) # pick the first one since they are all the same
     if y_axis_labels[0] is not None:
-        fig.supylabel(y_axis_labels[0])
+        fig.supylabel(y_axis_labels[0]) # pick the first one since they are all the same
     my_savefig(save_fig_name, fig=fig)
     fig.show()
 
@@ -1075,7 +1117,9 @@ def plot_gaussians(
         y_data_errs = y_data_errs[mask] if y_data_errs is not None else None
 
     plt.figure(figsize=const.FIG_SIZE, layout=const.FIG_LAYOUT)
+    # plot actual flux
     plt.plot(x, y_data, color='black', label='Data', lw = const.LINEWIDTH)
+    # plot total Gaussian fit
     plt.plot(x, summed_gaussian_vals, color='red', label='Total Gaussian fit', lw = 2*const.LINEWIDTH)
     if summed_gaussian_errs is not None:
         plt.fill_between(
@@ -1099,8 +1143,9 @@ def plot_gaussians(
         label = r"Reduced $\chi^2$ = "
         label += f"{red_chi_sq:.2f}"
         plt.text(
-            0.05, 0.95, label,
-            transform=plt.gca().transAxes,
+            x=0.05, y=0.95,
+            s=label, # text string
+            transform=plt.gca().transAxes, # uses fraction of axes width and height rather than actual x, y values as coordinates
             fontsize=const.TEXT_SIZE, verticalalignment='top'
         )
     plt.xlabel(x_axis_label)
@@ -1155,7 +1200,7 @@ def plot_ppxf_comp(
             raise ValueError("valid MAX_NL_COMP not found in GAS_ALL header")
 
         lam = hdul['WAVELENGTH'].data
-        galaxy = hdul['GALAXY'].data * scale_factor
+        galaxy = hdul['GALAXY'].data * scale_factor     # re multiply by median flux (if necessary)
         stellar = hdul['STELLAR'].data * scale_factor
         bestfit = hdul['BESTFIT'].data * scale_factor
         goodpixels = hdul['GOODPIXELS'].data
